@@ -1,0 +1,6 @@
+.next
+node_modules
+*.log
+tsconfig.tsbuildinfo
+login_out.html
+login_out2.html

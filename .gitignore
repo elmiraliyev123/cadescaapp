@@ -1,0 +1,25 @@
+# dependencies
+node_modules/
+
+# Next.js build output
+.next/
+out/
+
+# local Vercel link
+.vercel/
+
+# local Supabase link metadata
+supabase/.temp/
+
+# environment
+.env*
+!.env.example
+
+# logs and local artifacts
+*.log
+dev.log
+login_out*.html
+.DS_Store
+
+# TypeScript
+*.tsbuildinfo
