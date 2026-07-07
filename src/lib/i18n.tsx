@@ -490,7 +490,22 @@ export const translations = {
       forCompanies: "Cadesca for Companies",
       forCompaniesDesc: "Cadesca is not just for universities — very soon it will serve corporate companies too. Stay in touch with us to digitize your employees' meal benefits and manage them with a centralized system.",
       footerDescription: "Want to see Cadesca at your university or company? Write to us for collaboration.",
-      contactUs: "Contact Us"
+      contactUs: "Contact Us",
+      footerCopyright: "© 2026 Cadesca. All rights reserved.",
+      privacy: "Privacy",
+      terms: "Terms",
+      safety: "Safety",
+      guidelines: "Guidelines",
+      contact: "Contact",
+      privacyTitle: "Privacy Policy",
+      termsTitle: "Terms of Use",
+      safetyTitle: "Safety Center",
+      guidelinesTitle: "Community Guidelines",
+      heroTitleNew: "Your Campus, Connected",
+      heroDescNew: "A simple space for students to meet, share, and grow together. Join your university's private community today.",
+      loginBtn: "Log in",
+      createAccountBtn: "Create new account",
+      universityEmailHint: "Use your university email to join your campus."
     }
   },
   az: {
@@ -967,7 +982,22 @@ export const translations = {
       forCompanies: "Şirkətlər üçün Cadesca",
       forCompaniesDesc: "Cadesca yalnız universitetlərdə deyil, çox yaxında korporativ şirkətlərin də xidmətində olacaq. Əməkdaşlarınızın yemək benefitlərini rəqəmsallaşdırmaq və mərkəzləşdirilmiş sistemlə idarə etmək üçün bizimlə əlaqədə qalın.",
       footerDescription: "Cadesca-nı öz universitetinizdə və ya şirkətinizdə görmək istəyirsiniz? Əməkdaşlıq üçün bizə yazın.",
-      contactUs: "Bizimlə Əlaqə"
+      contactUs: "Bizimlə Əlaqə",
+      footerCopyright: "© 2026 Cadesca. Bütün hüquqlar qorunur.",
+      privacy: "Gizlilik",
+      terms: "Şərtlər",
+      safety: "Təhlükəsizlik",
+      guidelines: "Qaydalar",
+      contact: "Əlaqə",
+      privacyTitle: "Gizlilik Siyasəti",
+      termsTitle: "İstifadə Şərtləri",
+      safetyTitle: "Təhlükəsizlik Mərkəzi",
+      guidelinesTitle: "İcma Qaydaları",
+      heroTitleNew: "Kampusun, Bir Yerdə",
+      heroDescNew: "Tələbələrin tanışması, paylaşması və birlikdə böyüməsi üçün sadə bir məkan. Bu gün universitetinin özəl icmasına qoşul.",
+      loginBtn: "Daxil ol",
+      createAccountBtn: "Yeni hesab yarat",
+      universityEmailHint: "Kampusuna qoşulmaq üçün universitet emailindən istifadə et."
     }
   },
   ru: {
@@ -1445,7 +1475,22 @@ export const translations = {
       forCompanies: "Cadesca для компаний",
       forCompaniesDesc: "Cadesca — не только для университетов, очень скоро она будет доступна и для корпоративных компаний. Свяжитесь с нами, чтобы оцифровать льготы на питание сотрудников и управлять ими через централизованную систему.",
       footerDescription: "Хотите видеть Cadesca в своём университете или компании? Напишите нам для сотрудничества.",
-      contactUs: "Свяжитесь с нами"
+      contactUs: "Свяжитесь с нами",
+      footerCopyright: "© 2026 Cadesca. Все права защищены.",
+      privacy: "Конфиденциальность",
+      terms: "Условия",
+      safety: "Безопасность",
+      guidelines: "Правила",
+      contact: "Контакты",
+      privacyTitle: "Политика конфиденциальности",
+      termsTitle: "Условия использования",
+      safetyTitle: "Центр безопасности",
+      guidelinesTitle: "Правила сообщества",
+      heroTitleNew: "Твой кампус, на связи",
+      heroDescNew: "Простое пространство для знакомства, общения и совместного развития студентов. Присоединяйся к частному сообществу своего университета.",
+      loginBtn: "Войти",
+      createAccountBtn: "Создать аккаунт",
+      universityEmailHint: "Используй email университета для подключения к кампусу."
     }
   },
   tr: {
