@@ -1,6 +1,12 @@
 .next
 node_modules
+.git
+.vercel
+.env*
+!.env.example
 *.log
+.DS_Store
+supabase/.temp
 tsconfig.tsbuildinfo
 login_out.html
 login_out2.html
