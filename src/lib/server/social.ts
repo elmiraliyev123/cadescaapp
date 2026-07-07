@@ -418,7 +418,7 @@ export async function getCurrentStudentContext(): Promise<CurrentStudentContext 
       displayName: "Demo Student",
       bio: null,
       avatarUrl: null,
-      universityId: null,
+      universityId: "demo_bilkent",
       universityName: "Bilkent University",
       universitySlug: "bilkent",
       universityEmailDomain: "bilkent.edu.tr",
@@ -429,7 +429,7 @@ export async function getCurrentStudentContext(): Promise<CurrentStudentContext 
       verifiedAt: null,
       verifiedVia: "email",
       createdAt: null,
-      socialReady: false
+      socialReady: true
     };
   }
 

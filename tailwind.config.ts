@@ -83,10 +83,16 @@ const config: Config = {
         "body-md": ["16px", { lineHeight: "24px", letterSpacing: "0", fontWeight: "400" }],
         "headline-lg-mobile": ["24px", { lineHeight: "32px", letterSpacing: "-0.01em", fontWeight: "600" }],
         "body-lg": ["18px", { lineHeight: "28px", letterSpacing: "0", fontWeight: "400" }],
-        caption: ["12px", { lineHeight: "16px", letterSpacing: "0.01em", fontWeight: "500" }]
+        caption: ["12px", { lineHeight: "16px", letterSpacing: "0.01em", fontWeight: "500" }],
+        "body-sm": ["14px", { lineHeight: "20px", letterSpacing: "0", fontWeight: "400" }],
+        "title-md": ["16px", { lineHeight: "24px", letterSpacing: "0", fontWeight: "600" }],
+        "title-lg": ["20px", { lineHeight: "28px", letterSpacing: "-0.01em", fontWeight: "600" }],
+        "label-lg": ["16px", { lineHeight: "24px", letterSpacing: "0.01em", fontWeight: "600" }],
+        "headline-sm": ["20px", { lineHeight: "28px", letterSpacing: "-0.01em", fontWeight: "600" }]
       },
       boxShadow: {
-        soft: "0 1px 2px rgba(26, 28, 29, 0.04)"
+        soft: "0 1px 2px rgba(26, 28, 29, 0.04)",
+        md: "0 4px 6px -1px rgba(0,0,0,0.07), 0 2px 4px -2px rgba(0,0,0,0.05)"
       }
     }
   },

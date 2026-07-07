@@ -58,11 +58,11 @@ select {
 
 @layer components {
   .premium-card {
-    @apply min-w-0 rounded-xl border border-outline-variant/70 bg-surface-container-lowest;
+    @apply min-w-0 rounded-2xl border border-outline-variant/30 bg-surface-container-lowest shadow-[0_1px_3px_rgba(0,0,0,0.04)];
   }
 
   .premium-card-muted {
-    @apply min-w-0 rounded-xl border border-outline-variant/70 bg-surface-container-low;
+    @apply min-w-0 rounded-2xl border border-outline-variant/30 bg-surface-container-low;
   }
 
   .section-grid {

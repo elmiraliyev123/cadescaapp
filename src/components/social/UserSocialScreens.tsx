@@ -106,7 +106,7 @@ function Avatar({
   return (
     <div
       className={cn(
-        "flex shrink-0 items-center justify-center overflow-hidden rounded-full border border-outline-variant/70 font-semibold",
+        "flex shrink-0 items-center justify-center overflow-hidden rounded-full border border-outline-variant/30 font-semibold",
         sizes[size],
         inverse ? "bg-primary text-on-primary" : "bg-surface-container-low text-primary"
       )}
@@ -140,7 +140,7 @@ function VerifiedBadge() {
         <span
           id={tooltipId}
           role="tooltip"
-          className="absolute left-0 top-9 z-20 w-64 rounded-xl border border-outline-variant/70 bg-surface-container-lowest p-3 text-caption font-semibold text-secondary shadow-soft"
+          className="absolute left-0 top-9 z-20 w-64 rounded-xl border border-outline-variant/30 bg-surface-container-lowest p-3 text-caption font-semibold text-secondary shadow-soft"
         >
           This badge means your student status has been verified by Cadesca.
         </span>
@@ -172,8 +172,8 @@ function VerificationGate({ user }: { user: CurrentStudentContext | null }) {
   }
 
   return (
-    <div className="mx-auto max-w-xl rounded-2xl border border-outline-variant/70 bg-surface-container-lowest p-6 text-center">
-      <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full border border-outline-variant/70 bg-surface-container-low">
+    <div className="mx-auto max-w-xl rounded-2xl border border-outline-variant/30 bg-surface-container-lowest p-6 text-center shadow-[0_1px_3px_rgba(0,0,0,0.04)]">
+      <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full border border-outline-variant/30 bg-surface-container-low">
         <span className="material-symbols-outlined text-[24px] text-primary" aria-hidden="true">{icon}</span>
       </div>
       <h2 className="mt-4 text-headline-md font-semibold text-primary">{title}</h2>
@@ -194,7 +194,7 @@ export function SocialUnavailableScreen({ message: _message }: { message?: strin
   return (
     <section>
       <SocialPageHeader title="Home" subtitle="Cadesca university community" />
-      <div className="mx-auto max-w-xl rounded-2xl border border-outline-variant/70 bg-surface-container-lowest p-6 text-center">
+      <div className="mx-auto max-w-xl rounded-2xl border border-outline-variant/30 bg-surface-container-lowest p-6 text-center shadow-[0_1px_3px_rgba(0,0,0,0.04)]">
         <span className="material-symbols-outlined text-[28px] text-primary" aria-hidden="true">hourglass_empty</span>
         <h2 className="mt-3 text-headline-md font-semibold text-primary">Campus community is almost ready</h2>
         <p className="mt-2 text-body-md text-secondary">We're setting up your private university space. Please check back soon.</p>
@@ -219,7 +219,7 @@ function PostComposer({
   const community = campusCommunityName(user);
 
   return (
-    <form action={formAction} className="rounded-2xl border border-outline-variant/70 bg-surface-container-lowest p-4">
+    <form action={formAction} className="rounded-2xl border border-outline-variant/30 bg-surface-container-lowest p-4 shadow-[0_1px_3px_rgba(0,0,0,0.04)]">
       {redirectAfterPost ? <input type="hidden" name="redirectToHome" value="true" /> : null}
       <div className="flex gap-3">
         <div className="mt-1">
@@ -245,7 +245,7 @@ function PostComposer({
             )}
           />
           <div className="mt-3 flex flex-col gap-3 sm:flex-row sm:items-center">
-            <label className="flex min-w-0 flex-1 items-center gap-2 rounded-full border border-outline-variant/70 bg-surface-container-lowest px-3 py-2">
+            <label className="flex min-w-0 flex-1 items-center gap-2 rounded-full border border-outline-variant/30 bg-surface-container-lowest px-3 py-2">
               <span className="material-symbols-outlined text-[18px] text-secondary" aria-hidden="true">image</span>
               <span className="sr-only">Optional image URL</span>
               <input
@@ -294,7 +294,7 @@ function ActionIconButton({
       className={cn(
         "inline-flex h-9 items-center justify-center gap-1.5 rounded-full border border-transparent px-3 text-caption font-semibold transition-colors disabled:cursor-wait disabled:opacity-60",
         !children && "w-9 px-0",
-        active ? "bg-primary text-on-primary" : "text-secondary hover:border-outline-variant/70 hover:bg-surface-container-low hover:text-primary"
+        active ? "bg-primary text-on-primary" : "text-secondary hover:bg-surface-container-low hover:text-primary"
       )}
     >
       <span className={cn("material-symbols-outlined text-[18px]", active && "material-symbols-filled")} aria-hidden="true">{icon}</span>
@@ -313,7 +313,7 @@ function CommentForm({ postId }: { postId: string }) {
         name="body"
         maxLength={500}
         placeholder="Write a comment"
-        className="h-10 min-w-0 flex-1 rounded-lg border border-outline-variant/70 bg-surface-container-lowest px-3 text-label-md text-primary outline-none transition focus:border-primary"
+        className="h-10 min-w-0 flex-1 rounded-lg border border-outline-variant/30 bg-surface-container-lowest px-3 text-label-md text-primary outline-none transition focus:border-primary"
       />
       <Button type="submit" size="sm" variant="secondary" icon="chat_bubble" disabled={isPending}>
         {isPending ? "Sending" : "Reply"}
@@ -327,8 +327,8 @@ function SocialPostCard({ post }: { post: SocialPost }) {
   const [commentsOpen, setCommentsOpen] = useState(post.comments.length > 0);
 
   return (
-    <article className="overflow-hidden rounded-2xl border border-outline-variant/70 bg-surface-container-lowest">
-      <div className="p-4">
+    <article className="overflow-hidden rounded-2xl border border-outline-variant/30 bg-surface-container-lowest shadow-[0_1px_3px_rgba(0,0,0,0.04)]">
+      <div className="px-4 py-3">
         <div className="flex items-start justify-between gap-3">
           <div className="flex min-w-0 gap-3">
             <Avatar name={post.authorName} src={post.authorAvatarUrl} />
@@ -358,20 +358,22 @@ function SocialPostCard({ post }: { post: SocialPost }) {
             <form action={reportPostAction}>
               <input type="hidden" name="postId" value={post.id} />
               <input type="hidden" name="reason" value="Reported from feed" />
-              <ActionIconButton icon="flag" title="Report post" />
+              <ActionIconButton icon="flag" title="Report post">
+                Report
+              </ActionIconButton>
             </form>
           )}
         </div>
 
-        <p className="mt-4 whitespace-pre-wrap break-words text-body-md text-primary">{post.body}</p>
+        <p className="mt-2.5 whitespace-pre-wrap break-words text-body-md text-primary">{post.body}</p>
 
         {post.imageUrl ? (
-          <div className="mt-4 overflow-hidden rounded-2xl border border-outline-variant/70 bg-surface-container-low">
+          <div className="mt-3 overflow-hidden rounded-2xl border border-outline-variant/20 bg-surface-container-low">
             <img src={post.imageUrl} alt="" className="max-h-[520px] w-full object-cover" />
           </div>
         ) : null}
 
-        <div className="mt-4 flex flex-wrap items-center gap-1 border-t border-outline-variant/70 pt-3">
+        <div className="mt-3 flex flex-wrap items-center gap-1 border-t border-outline-variant/20 pt-2">
           <form action={togglePostLikeAction}>
             <input type="hidden" name="postId" value={post.id} />
             <ActionIconButton icon="favorite" active={post.likedByCurrentUser} title="Like post">
@@ -381,14 +383,14 @@ function SocialPostCard({ post }: { post: SocialPost }) {
           <button
             type="button"
             onClick={() => setCommentsOpen((open) => !open)}
-            className="inline-flex h-9 items-center gap-1.5 rounded-full border border-transparent px-3 text-caption font-semibold text-secondary transition-colors hover:border-outline-variant/70 hover:bg-surface-container-low hover:text-primary"
+            className="inline-flex h-9 items-center gap-1.5 rounded-full border border-transparent px-3 text-caption font-semibold text-secondary transition-colors hover:bg-surface-container-low hover:text-primary"
           >
             <span className="material-symbols-outlined text-[18px]" aria-hidden="true">mode_comment</span>
             <span>{post.commentCount}</span>
           </button>
           <button
             type="button"
-            className="inline-flex h-9 items-center gap-1.5 rounded-full border border-transparent px-3 text-caption font-semibold text-secondary transition-colors hover:border-outline-variant/70 hover:bg-surface-container-low hover:text-primary"
+            className="inline-flex h-9 items-center gap-1.5 rounded-full border border-transparent px-3 text-caption font-semibold text-secondary transition-colors hover:bg-surface-container-low hover:text-primary"
             title="Share"
           >
             <span className="material-symbols-outlined text-[18px]" aria-hidden="true">ios_share</span>
@@ -397,7 +399,7 @@ function SocialPostCard({ post }: { post: SocialPost }) {
         </div>
 
         {commentsOpen ? (
-          <div className="mt-3 border-t border-outline-variant/70 pt-3">
+          <div className="mt-3 border-t border-outline-variant/20 pt-3">
             <div className="space-y-3">
               {post.comments.map((comment) => (
                 <div key={comment.id} className="rounded-2xl bg-surface-container-low px-3 py-2">
@@ -444,7 +446,7 @@ function FeedList({
 }) {
   if (!posts.length) {
     return (
-      <div className="rounded-2xl border border-outline-variant/70 bg-surface-container-lowest p-6 text-center">
+      <div className="rounded-2xl border border-outline-variant/30 bg-surface-container-lowest p-6 text-center shadow-[0_1px_3px_rgba(0,0,0,0.04)]">
         <span className="material-symbols-outlined text-[28px] text-primary" aria-hidden="true">forum</span>
         <h2 className="mt-3 text-headline-md font-semibold text-primary">{emptyTitle}</h2>
         <p className="mt-2 text-body-md text-secondary">{emptyDescription}</p>
@@ -462,7 +464,7 @@ function FeedList({
   }
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-3">
       {posts.map((post) => (
         <SocialPostCard key={post.id} post={post} />
       ))}
@@ -480,9 +482,14 @@ export function HomeFeedScreen({ user, posts }: { user: CurrentStudentContext | 
         subtitle={universityLabel}
       />
       {isVerifiedStudent(user) ? (
-        <div className="mx-auto grid max-w-3xl gap-4">
+        <div className="mx-auto grid max-w-xl gap-3">
           <PostComposer compact user={user} />
-          <FeedList posts={posts} />
+          <FeedList
+            posts={posts}
+            emptyTitle="Be the first to post"
+            emptyDescription="Share something with verified students from your university."
+            showCreateAction
+          />
         </div>
       ) : (
         <VerificationGate user={user} />
@@ -491,62 +498,93 @@ export function HomeFeedScreen({ user, posts }: { user: CurrentStudentContext | 
   );
 }
 
-export function ExploreScreen({ user, posts }: { user: CurrentStudentContext | null; posts: SocialPost[] }) {
-  const featureCards = [
-    {
-      icon: "home_work",
-      title: "Roommate Finder",
-      description: "Find verified students looking for roommates.",
-      status: "Soon"
-    },
-    {
-      icon: "favorite",
-      title: "Match Finder",
-      description: "Opt-in campus matching for verified students.",
-      status: "Soon"
-    },
-    {
-      icon: "event",
-      title: "Events",
-      description: "Discover campus events and activities.",
-      status: "Soon"
-    },
-    {
-      icon: "storefront",
-      title: "Marketplace",
-      description: "Buy, sell, or trade with verified students.",
-      status: "Soon"
-    },
-    {
-      icon: "trending_up",
-      title: "Trending Posts",
-      description: "Popular posts from your university.",
-      status: posts.length ? "Live" : "Beta"
-    }
-  ];
+const exploreFeatureCards: ReadonlyArray<{
+  icon: string;
+  title: string;
+  description: string;
+  imageUrl: string;
+}> = [
+  {
+    icon: "home_work",
+    title: "Roommate Finder",
+    description: "Find verified students looking for roommates.",
+    imageUrl: "https://images.unsplash.com/photo-1522202176988-66273c2fd55f?auto=format&fit=crop&w=1400&q=82"
+  },
+  {
+    icon: "favorite",
+    title: "MatchMe",
+    description: "Opt-in campus matching for verified students.",
+    imageUrl: "https://images.unsplash.com/photo-1529333166437-7750a6dd5a70?auto=format&fit=crop&w=1400&q=82"
+  },
+  {
+    icon: "event_available",
+    title: "Events",
+    description: "Discover campus events and join what matters.",
+    imageUrl: "https://images.unsplash.com/photo-1470229722913-7c0e2dbbafd3?auto=format&fit=crop&w=1400&q=82"
+  },
+  {
+    icon: "local_mall",
+    title: "Marketplace",
+    description: "Buy, sell and trade within your campus.",
+    imageUrl: "https://images.unsplash.com/photo-1523275335684-37898b6baf30?auto=format&fit=crop&w=1400&q=82"
+  }
+];
 
+function ExploreFeatureCard({
+  icon,
+  title,
+  description,
+  imageUrl
+}: {
+  icon: string;
+  title: string;
+  description: string;
+  imageUrl: string;
+}) {
+  return (
+    <article className="group relative h-36 overflow-hidden rounded-[1.65rem] bg-primary text-on-primary shadow-[0_8px_24px_rgba(0,0,0,0.16)] sm:h-[220px]">
+      <img
+        src={imageUrl}
+        alt=""
+        className="absolute inset-0 h-full w-full object-cover transition duration-500 group-hover:scale-[1.03]"
+        loading="lazy"
+      />
+      <div className="absolute inset-0 bg-[linear-gradient(90deg,rgba(0,0,0,0.78)_0%,rgba(0,0,0,0.48)_38%,rgba(0,0,0,0.08)_100%)]" />
+      <div className="absolute inset-x-0 bottom-0 h-2/3 bg-gradient-to-t from-black/70 via-black/30 to-transparent" />
+
+      <div className="relative flex h-full flex-col justify-between p-5 sm:p-6">
+        <span className="flex h-14 w-14 items-center justify-center rounded-full bg-white text-primary shadow-[0_8px_20px_rgba(0,0,0,0.16)] sm:h-[76px] sm:w-[76px]">
+          <span className="material-symbols-outlined text-[29px] sm:text-[38px]" aria-hidden="true">{icon}</span>
+        </span>
+
+        <div className="min-w-0 pr-20 sm:pr-28">
+          <h2 className="whitespace-nowrap text-[24px] font-bold leading-[1.05] tracking-normal text-white sm:text-[32px] sm:leading-[1.08]">{title}</h2>
+          <p className="mt-1.5 max-w-[16rem] text-[16px] font-semibold leading-[1.18] text-white sm:mt-2 sm:text-[18px] sm:leading-[1.25]">
+            {description}
+          </p>
+        </div>
+        <span className="absolute bottom-5 right-5 inline-flex h-10 items-center justify-center rounded-2xl border border-white/60 bg-white/90 px-5 text-label-md font-bold text-primary shadow-[inset_0_0_0_1px_rgba(0,0,0,0.12),0_8px_18px_rgba(0,0,0,0.20)] backdrop-blur sm:h-11 sm:px-6 sm:text-label-lg">
+          Soon
+        </span>
+      </div>
+    </article>
+  );
+}
+
+export function ExploreScreen({ user, posts }: { user: CurrentStudentContext | null; posts: SocialPost[] }) {
   return (
     <section>
       <SocialPageHeader title="Explore" subtitle={`${campusCommunityName(user)} launchpad`} />
       {isVerifiedStudent(user) ? (
-        <div className="mx-auto max-w-5xl space-y-5">
-          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-            {featureCards.map((card) => (
-              <article key={card.title} className="rounded-2xl border border-outline-variant/70 bg-surface-container-lowest p-4">
-                <div className="flex items-start justify-between gap-3">
-                  <span className="material-symbols-outlined flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-outline-variant/70 bg-surface-container-low text-[21px] text-primary" aria-hidden="true">
-                    {card.icon}
-                  </span>
-                  <Badge tone={card.title === "Trending Posts" && posts.length ? "inverse" : "muted"}>{card.status}</Badge>
-                </div>
-                <h2 className="mt-4 text-title-md font-semibold text-primary">{card.title}</h2>
-                <p className="mt-2 text-body-sm text-secondary">{card.description}</p>
-              </article>
+        <div className="mx-auto max-w-3xl space-y-6">
+          <div className="grid gap-3 sm:gap-4">
+            {exploreFeatureCards.map((card) => (
+              <ExploreFeatureCard key={card.title} {...card} />
             ))}
           </div>
           <div>
             <div className="mb-3 flex items-center justify-between gap-3">
-              <h2 className="text-headline-md font-semibold text-primary">Trending Posts</h2>
+              <h2 className="text-headline-md font-semibold text-primary">Campus Posts</h2>
               <Badge tone="muted">{posts.length} posts</Badge>
             </div>
             <FeedList
@@ -591,9 +629,9 @@ export function ActivityScreen({
       {isVerifiedStudent(user) ? (
         <div className="mx-auto max-w-3xl space-y-3">
           {items.length ? items.map((item) => (
-            <div key={item.id} className="rounded-2xl border border-outline-variant/70 bg-surface-container-lowest p-4">
+            <div key={item.id} className="rounded-2xl border border-outline-variant/30 bg-surface-container-lowest px-4 py-3 shadow-[0_1px_3px_rgba(0,0,0,0.04)]">
               <div className="flex gap-3">
-                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-outline-variant/70 bg-surface-container-low">
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-outline-variant/30 bg-surface-container-low">
                   <span className="material-symbols-outlined text-[20px] text-primary" aria-hidden="true">
                     {item.type === "like" ? "favorite" : item.type === "follow" ? "person_add" : "mode_comment"}
                   </span>
@@ -615,7 +653,7 @@ export function ActivityScreen({
               </div>
             </div>
           )) : (
-            <div className="rounded-2xl border border-outline-variant/70 bg-surface-container-lowest p-6 text-center">
+            <div className="rounded-2xl border border-outline-variant/30 bg-surface-container-lowest p-6 text-center shadow-[0_1px_3px_rgba(0,0,0,0.04)]">
               <span className="material-symbols-outlined text-[28px] text-primary" aria-hidden="true">notifications</span>
               <h2 className="mt-3 text-headline-md font-semibold text-primary">No activity yet</h2>
               <p className="mt-2 text-body-md text-secondary">Likes, comments, follows, and replies will appear here.</p>
@@ -661,7 +699,7 @@ function LanguageSettings() {
         value={selectedLanguage}
         disabled={isPending}
         onChange={(event) => changeLanguage(event.target.value as Language)}
-        className="mt-4 h-11 w-full rounded-lg border border-outline-variant/70 bg-surface-container-lowest px-3 text-label-md text-primary outline-none transition focus:border-primary disabled:cursor-wait disabled:opacity-60"
+        className="mt-4 h-11 w-full rounded-lg border border-outline-variant/30 bg-surface-container-lowest px-3 text-label-md text-primary outline-none transition focus:border-primary disabled:cursor-wait disabled:opacity-60"
       >
         {LANGUAGE_OPTIONS.map((option) => (
           <option key={option.value} value={option.value}>
@@ -737,7 +775,7 @@ export function ProfileSettingsScreen({ user }: { user: CurrentStudentContext | 
       {user ? (
         <div className="mx-auto grid max-w-5xl gap-5 xl:grid-cols-[minmax(0,1fr)_340px]">
           <form action={formAction} encType="multipart/form-data" className="premium-card p-5">
-            <div className="flex flex-wrap items-center gap-4 border-b border-outline-variant/70 pb-5">
+            <div className="flex flex-wrap items-center gap-4 border-b border-outline-variant/20 pb-5">
               <Avatar name={profileName} src={user.avatarUrl} size="xl" inverse />
               <div className="min-w-0">
                 <h2 className="break-words text-headline-md font-semibold text-primary">{profileName}</h2>
@@ -754,13 +792,13 @@ export function ProfileSettingsScreen({ user }: { user: CurrentStudentContext | 
                   name="displayName"
                   defaultValue={user.displayName || user.name}
                   maxLength={80}
-                  className="h-11 w-full rounded-lg border border-outline-variant/70 bg-surface-container-lowest px-4 text-label-md text-primary outline-none transition focus:border-primary"
+                  className="h-11 w-full rounded-lg border border-outline-variant/30 bg-surface-container-lowest px-4 text-label-md text-primary outline-none transition focus:border-primary"
                 />
               </label>
 
               <label className="block">
                 <span className="mb-2 block text-caption font-semibold uppercase text-secondary">Username</span>
-                <div className="flex h-11 items-center rounded-lg border border-outline-variant/70 bg-surface-container-lowest focus-within:border-primary">
+                <div className="flex h-11 items-center rounded-lg border border-outline-variant/30 bg-surface-container-lowest focus-within:border-primary">
                   <span className="pl-4 text-label-md font-semibold text-secondary">@</span>
                   <input
                     name="username"
@@ -781,7 +819,7 @@ export function ProfileSettingsScreen({ user }: { user: CurrentStudentContext | 
                   defaultValue={user.bio || ""}
                   rows={4}
                   maxLength={240}
-                  className="min-h-28 w-full resize-none rounded-lg border border-outline-variant/70 bg-surface-container-lowest px-4 py-3 text-label-md text-primary outline-none transition focus:border-primary"
+                  className="min-h-28 w-full resize-none rounded-lg border border-outline-variant/30 bg-surface-container-lowest px-4 py-3 text-label-md text-primary outline-none transition focus:border-primary"
                 />
               </label>
 
@@ -791,11 +829,11 @@ export function ProfileSettingsScreen({ user }: { user: CurrentStudentContext | 
                   name="avatar"
                   type="file"
                   accept="image/jpeg,image/png,image/webp"
-                  className="block w-full rounded-lg border border-outline-variant/70 bg-surface-container-lowest px-4 py-3 text-label-md text-primary file:mr-4 file:rounded-md file:border-0 file:bg-primary file:px-3 file:py-2 file:text-caption file:font-semibold file:text-on-primary"
+                  className="block w-full rounded-lg border border-outline-variant/30 bg-surface-container-lowest px-4 py-3 text-label-md text-primary file:mr-4 file:rounded-md file:border-0 file:bg-primary file:px-3 file:py-2 file:text-caption file:font-semibold file:text-on-primary"
                 />
               </label>
 
-              <div className="flex flex-wrap items-center justify-between gap-3 border-t border-outline-variant/70 pt-4">
+              <div className="flex flex-wrap items-center justify-between gap-3 border-t border-outline-variant/20 pt-4">
                 <p className={cn("text-caption font-semibold", state.message ? (state.ok ? "text-primary" : "text-secondary") : "text-secondary")}>
                   {state.message || "Changes apply to your campus profile."}
                 </p>
@@ -835,7 +873,7 @@ export function PublicProfileScreen({ profile }: { profile: PublicStudentProfile
         action={
           <Link
             href="/app/user/home"
-            className="inline-flex h-10 items-center justify-center gap-2 rounded-lg border border-outline-variant/70 bg-surface-container-lowest px-4 text-label-md font-semibold text-primary transition-colors hover:bg-surface-container-low"
+            className="inline-flex h-10 items-center justify-center gap-2 rounded-lg border border-outline-variant/30 bg-surface-container-lowest px-4 text-label-md font-semibold text-primary transition-colors hover:bg-surface-container-low"
           >
             <span className="material-symbols-outlined text-[18px]" aria-hidden="true">arrow_back</span>
             Home
@@ -867,7 +905,7 @@ export function PublicProfileScreen({ profile }: { profile: PublicStudentProfile
             ) : (
               <Link
                 href="/app/user/settings"
-                className="inline-flex h-11 items-center justify-center gap-2 rounded-lg border border-outline-variant/70 bg-surface-container-lowest px-4 text-label-md font-semibold text-primary transition-colors hover:bg-surface-container-low"
+                className="inline-flex h-11 items-center justify-center gap-2 rounded-lg border border-outline-variant/30 bg-surface-container-lowest px-4 text-label-md font-semibold text-primary transition-colors hover:bg-surface-container-low"
               >
                 <span className="material-symbols-outlined text-[18px]" aria-hidden="true">settings</span>
                 Settings
@@ -940,7 +978,7 @@ export function ProfileScreen({
         action={
           <Link
             href="/app/user/settings"
-            className="inline-flex h-10 items-center justify-center gap-2 rounded-lg border border-outline-variant/70 bg-surface-container-lowest px-4 text-label-md font-semibold text-primary transition-colors hover:bg-surface-container-low"
+            className="inline-flex h-10 items-center justify-center gap-2 rounded-lg border border-outline-variant/30 bg-surface-container-lowest px-4 text-label-md font-semibold text-primary transition-colors hover:bg-surface-container-low"
           >
             <span className="material-symbols-outlined text-[18px]" aria-hidden="true">settings</span>
             Settings
@@ -949,7 +987,7 @@ export function ProfileScreen({
       />
       <div className="mx-auto grid w-full max-w-5xl gap-5 xl:grid-cols-[minmax(0,1fr)_340px]">
         <div className="space-y-5">
-          <div className="rounded-2xl border border-outline-variant/70 bg-surface-container-lowest p-5">
+          <div className="rounded-2xl border border-outline-variant/30 bg-surface-container-lowest p-5 shadow-[0_1px_3px_rgba(0,0,0,0.04)]">
             <div className="flex flex-col items-start gap-4 sm:flex-row">
               <Avatar name={profileName} src={user?.avatarUrl} size="xl" inverse />
               <div className="w-full min-w-0 flex-1">
@@ -962,7 +1000,7 @@ export function ProfileScreen({
                 </p>
                 <p className="mt-2 text-label-md font-semibold text-primary">{universityLabel}</p>
                 {user?.bio ? <p className="mt-3 max-w-2xl whitespace-pre-wrap break-words text-body-md text-primary">{user.bio}</p> : null}
-                <div className="mt-5 grid w-full max-w-md grid-cols-3 gap-2 border-y border-outline-variant/70 py-3 text-center sm:gap-4">
+                <div className="mt-5 grid w-full max-w-md grid-cols-3 gap-2 border-y border-outline-variant/20 py-3 text-center sm:gap-4">
                   <div>
                     <p className="text-title-md font-semibold text-primary">{stats.postsCount}</p>
                     <p className="mt-0.5 text-caption font-semibold text-secondary">Posts</p>
@@ -977,7 +1015,7 @@ export function ProfileScreen({
                   </div>
                 </div>
                 {user?.username ? (
-                  <Link href={`/user/${user.username}`} className="mt-4 inline-flex h-9 items-center justify-center rounded-lg border border-outline-variant/70 px-3 text-caption font-semibold text-primary transition-colors hover:bg-surface-container-low">
+                  <Link href={`/user/${user.username}`} className="mt-4 inline-flex h-9 items-center justify-center rounded-lg border border-outline-variant/30 px-3 text-caption font-semibold text-primary transition-colors hover:bg-surface-container-low">
                     View public profile
                   </Link>
                 ) : null}
@@ -985,7 +1023,7 @@ export function ProfileScreen({
             </div>
           </div>
 
-          <nav className="flex gap-2 overflow-x-auto rounded-full border border-outline-variant/70 bg-surface-container-lowest p-1" aria-label="Profile sections">
+          <nav className="flex gap-2 overflow-x-auto rounded-full border border-outline-variant/30 bg-surface-container-lowest p-1 shadow-[0_1px_3px_rgba(0,0,0,0.04)]" aria-label="Profile sections">
             {[
               { href: "#posts", icon: "forum", label: "Posts" },
               { href: "#student-pass", icon: "qr_code_2", label: "Student Pass" }
@@ -1024,7 +1062,7 @@ export function ProfileScreen({
         </div>
 
         <aside className="space-y-5">
-          <div className="rounded-2xl border border-outline-variant/70 bg-surface-container-lowest p-5">
+          <div className="rounded-2xl border border-outline-variant/30 bg-surface-container-lowest p-5 shadow-[0_1px_3px_rgba(0,0,0,0.04)]">
             <h2 className="text-label-lg font-semibold text-primary">Campus verification</h2>
             <p className="mt-1 text-body-sm text-secondary">Your account is verified for your university community.</p>
             <div className="mt-4 space-y-3 text-label-md">
