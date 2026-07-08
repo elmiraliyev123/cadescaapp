@@ -41,7 +41,7 @@ function friendlyMessage(error: unknown) {
   if (message === "post_body_required") return "social.postBodyRequired";
   if (message === "post_body_too_long") return "social.postBodyTooLong";
   if (message === "invalid_image_url") return "social.invalidImageUrl";
-  if (message === "invalid_post_image_type") return "social.invalidPostImageType";
+  if (message === "invalid_post_image_type" || message === "image_moderation_invalid_input") return "social.invalidPostImageType";
   if (message === "post_image_file_too_large") return "social.postImageTooLarge";
   if (message === "post_image_upload_failed" || message === "post_image_bucket_missing") return "social.postImageUploadFailed";
   if (message === "image_rejected") return "social.imageRejected";

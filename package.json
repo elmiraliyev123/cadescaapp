@@ -9,6 +9,7 @@
     "dev": "next dev",
     "start": "next start",
     "build": "next build",
+    "test:moderation": "node --conditions=react-server --import tsx scripts/test-moderation.ts",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
@@ -39,6 +40,7 @@
     "autoprefixer": "^10.4.21",
     "postcss": "^8.5.6",
     "tailwindcss": "^3.4.17",
+    "tsx": "^4.23.0",
     "typescript": "^5.8.3"
   },
   "overrides": {

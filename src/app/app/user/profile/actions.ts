@@ -33,7 +33,7 @@ function profileSettingsMessage(error: unknown) {
   if (message === "username_taken") return "social.usernameTaken";
   if (message === "display_name_too_long") return "social.displayNameTooLong";
   if (message === "bio_too_long") return "social.bioTooLong";
-  if (message === "invalid_avatar_type") return "social.invalidAvatarType";
+  if (message === "invalid_avatar_type" || message === "image_moderation_invalid_input") return "social.invalidAvatarType";
   if (message === "avatar_file_too_large") return "social.avatarTooLarge";
   if (message === "avatar_bucket_missing") return "social.avatarBucketMissing";
   if (message === "avatar_upload_requires_supabase_auth") return "social.avatarUploadAuth";
