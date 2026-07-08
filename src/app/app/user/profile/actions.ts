@@ -43,6 +43,20 @@ function profileSettingsMessage(error: unknown) {
   return "social.profileSettingsFailed";
 }
 
+function errorReason(error: unknown) {
+  return error instanceof Error ? error.message : "unknown";
+}
+
+function logProfileAction(action: string, event: "start" | "success" | "failed", details: Record<string, unknown> = {}) {
+  const payload = { action, event, ...details };
+  if (event === "failed") {
+    console.error("[user_profile_action]", payload);
+    return;
+  }
+
+  console.info("[user_profile_action]", payload);
+}
+
 function getFirstUploadedFile(formData: FormData, name: string) {
   return formData.getAll(name).find((value): value is File => value instanceof File && value.size > 0) || null;
 }
@@ -51,95 +65,116 @@ export async function updateProfileSettingsAction(
   _previous: ProfileSettingsFormState,
   formData: FormData
 ): Promise<ProfileSettingsFormState> {
+  const avatar = getFirstUploadedFile(formData, "avatar");
+  const displayName = String(formData.get("displayName") || "");
+  const username = String(formData.get("username") || "");
+  const bio = String(formData.get("bio") || "");
+
+  logProfileAction("update_profile_settings", "start", {
+    hasAvatar: Boolean(avatar),
+    displayNameLength: displayName.length,
+    hasUsername: Boolean(username),
+    bioLength: bio.length
+  });
+
   try {
-    const avatar = getFirstUploadedFile(formData, "avatar");
     const avatarPath = avatar ? await uploadCurrentUserAvatar(avatar) : null;
 
     await updateCurrentUserProfile({
-      displayName: String(formData.get("displayName") || ""),
-      username: String(formData.get("username") || ""),
-      bio: String(formData.get("bio") || ""),
+      displayName,
+      username,
+      bio,
       avatarPath
     });
 
-    const username = String(formData.get("username") || "").trim().toLowerCase();
+    const normalizedUsername = username.trim().toLowerCase();
     revalidatePath("/app/user/profile");
     revalidatePath("/app/user/settings");
     revalidatePath("/app/user/home");
     revalidatePath("/app/user/explore");
-    if (username) revalidatePath(`/user/${username}`);
+    if (normalizedUsername) revalidatePath(`/user/${normalizedUsername}`);
 
+    logProfileAction("update_profile_settings", "success");
     return { ok: true, message: "social.profileSaved" };
   } catch (error) {
+    logProfileAction("update_profile_settings", "failed", { reason: errorReason(error) });
     return { ok: false, message: profileSettingsMessage(error) };
   }
 }
 
 export async function updateLanguagePreference(locale: SupportedLocale): Promise<LanguagePreferenceResult> {
-  if (!isSupportedLocale(locale)) {
-    throw new Error("invalid_locale");
-  }
-
-  const cookieStore = await cookies();
-  let updatedWithSupabaseAuth = false;
-  let supabase: Awaited<ReturnType<typeof createSupabaseServerClient>> | null = null;
+  logProfileAction("update_language_preference", "start", { locale });
 
   try {
-    supabase = await createSupabaseServerClient();
-  } catch {
-    // Existing legacy sessions remain supported during the Supabase migration.
-  }
-
-  if (supabase) {
-    const {
-      data: { user }
-    } = await supabase.auth.getUser();
-
-    if (user) {
-      const { data, error } = await supabase
-        .from("users")
-        .update({ locale })
-        .eq("auth_user_id", user.id)
-        .select("id")
-        .maybeSingle();
-
-      if (error) throw new Error("locale_update_failed");
-      if (!data) throw new Error("user_not_found");
-      updatedWithSupabaseAuth = true;
-    }
-  }
-
-  if (!updatedWithSupabaseAuth) {
-    const sessionToken = cookieStore.get(USER_SESSION_COOKIE)?.value;
-    const authSecret = process.env.AUTH_SECRET;
-    const legacySession =
-      sessionToken && authSecret
-        ? await verifyUserSessionToken(sessionToken, authSecret)
-        : null;
-
-    if (!legacySession || legacySession.role !== "user") {
-      throw new Error("unauthorized");
+    if (!isSupportedLocale(locale)) {
+      throw new Error("invalid_locale");
     }
 
-    if (process.env.NODE_ENV === "development" && legacySession.id === "user_mock") {
-      // The local demo user is not stored in the production users table.
-    } else {
-      await updateUserLocale(legacySession.id, locale);
+    const cookieStore = await cookies();
+    let updatedWithSupabaseAuth = false;
+    let supabase: Awaited<ReturnType<typeof createSupabaseServerClient>> | null = null;
+
+    try {
+      supabase = await createSupabaseServerClient();
+    } catch {
+      // Existing legacy sessions remain supported during the Supabase migration.
     }
+
+    if (supabase) {
+      const {
+        data: { user }
+      } = await supabase.auth.getUser();
+
+      if (user) {
+        const { data, error } = await supabase
+          .from("users")
+          .update({ locale })
+          .eq("auth_user_id", user.id)
+          .select("id")
+          .maybeSingle();
+
+        if (error) throw new Error("locale_update_failed");
+        if (!data) throw new Error("user_not_found");
+        updatedWithSupabaseAuth = true;
+      }
+    }
+
+    if (!updatedWithSupabaseAuth) {
+      const sessionToken = cookieStore.get(USER_SESSION_COOKIE)?.value;
+      const authSecret = process.env.AUTH_SECRET;
+      const legacySession =
+        sessionToken && authSecret
+          ? await verifyUserSessionToken(sessionToken, authSecret)
+          : null;
+
+      if (!legacySession || legacySession.role !== "user") {
+        throw new Error("unauthorized");
+      }
+
+      if (process.env.NODE_ENV === "development" && legacySession.id === "user_mock") {
+        // The local demo user is not stored in the production users table.
+      } else {
+        await updateUserLocale(legacySession.id, locale);
+      }
+    }
+
+    const cookieOptions = {
+      domain: getLocaleCookieDomain(),
+      path: "/",
+      maxAge: LOCALE_COOKIE_MAX_AGE,
+      sameSite: "lax" as const,
+      httpOnly: false,
+      secure: process.env.NODE_ENV === "production"
+    };
+
+    cookieStore.set(NEXT_LOCALE_COOKIE_NAME, locale, cookieOptions);
+    cookieStore.set(LANGUAGE_BANNER_DISMISSED_COOKIE_NAME, "true", cookieOptions);
+    revalidatePath("/", "layout");
+
+    logProfileAction("update_language_preference", "success", { updatedWithSupabaseAuth });
+    return { locale };
+  } catch (error) {
+    logProfileAction("update_language_preference", "failed", { reason: errorReason(error) });
+    throw error;
   }
-
-  const cookieOptions = {
-    domain: getLocaleCookieDomain(),
-    path: "/",
-    maxAge: LOCALE_COOKIE_MAX_AGE,
-    sameSite: "lax" as const,
-    httpOnly: false,
-    secure: process.env.NODE_ENV === "production"
-  };
-
-  cookieStore.set(NEXT_LOCALE_COOKIE_NAME, locale, cookieOptions);
-  cookieStore.set(LANGUAGE_BANNER_DISMISSED_COOKIE_NAME, "true", cookieOptions);
-  revalidatePath("/", "layout");
-
-  return { locale };
 }

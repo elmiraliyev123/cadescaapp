@@ -67,6 +67,61 @@ function isStaticBypass(pathname: string) {
   );
 }
 
+function isAppPath(pathname: string) {
+  return pathname === "/app" || pathname.startsWith("/app/");
+}
+
+function isNavigationMethod(method: string) {
+  return method === "GET" || method === "HEAD";
+}
+
+function isNextActionRequest(request: NextRequest) {
+  return request.headers.has("next-action");
+}
+
+function isRscRequest(request: NextRequest) {
+  const accept = request.headers.get("accept") || "";
+  const contentType = request.headers.get("content-type") || "";
+
+  return (
+    request.headers.get("rsc") === "1" ||
+    request.headers.has("next-router-state-tree") ||
+    request.headers.has("next-router-prefetch") ||
+    accept.includes("text/x-component") ||
+    contentType.includes("text/x-component")
+  );
+}
+
+function isNextInternalRequest(request: NextRequest) {
+  return (
+    request.nextUrl.pathname.startsWith("/_next/") ||
+    request.headers.has("next-url") ||
+    request.headers.get("purpose") === "prefetch" ||
+    request.headers.get("sec-purpose") === "prefetch"
+  );
+}
+
+function appRequestPassThroughReason(request: NextRequest) {
+  if (!isAppPath(request.nextUrl.pathname)) return null;
+  if (isNextActionRequest(request)) return "next_action";
+  if (isRscRequest(request)) return "rsc";
+  if (isNextInternalRequest(request)) return "next_internal";
+  if (!isNavigationMethod(request.method)) return "non_navigation_method";
+  return null;
+}
+
+function logAppRequestHandling(request: NextRequest, event: "pass_through" | "auth_redirect", reason: string) {
+  console.info("[middleware] app_request", {
+    event,
+    reason,
+    method: request.method,
+    pathname: request.nextUrl.pathname,
+    hasNextAction: isNextActionRequest(request),
+    isRsc: isRscRequest(request),
+    hasRouterState: request.headers.has("next-router-state-tree")
+  });
+}
+
 function isAdminAccessPath(pathname: string) {
   return (
     pathname === "/admin/login" ||
@@ -316,6 +371,12 @@ export async function middleware(request: NextRequest) {
   }
 
   const localeResolution = resolveLocale(request);
+  const passThroughReason = appRequestPassThroughReason(request);
+
+  if (passThroughReason) {
+    logAppRequestHandling(request, "pass_through", passThroughReason);
+    return finalizeResponse(request, localizedNextResponse(request, localeResolution));
+  }
 
   if (host === "auth.cadesca.com") {
     const authenticated = await hasStudentSession(request);
@@ -355,6 +416,7 @@ export async function middleware(request: NextRequest) {
     }
 
     if (pathname.startsWith("/app/") && !(await hasStudentSession(request))) {
+      logAppRequestHandling(request, "auth_redirect", "missing_student_session");
       return finalizeResponse(request, applyLocaleToResponse(authLoginRedirect(request), localeResolution));
     }
   }
