@@ -161,7 +161,15 @@ async function testWorkersAiRestLicenseRetry() {
       success: false,
       errors: [{ code: 10000, message: "Please agree to Meta License and Acceptable Use Policy with prompt agree." }]
     }), { status: 403 }),
-    new Response(JSON.stringify({ success: true, result: { response: "agreement recorded" } }), { status: 200 }),
+    new Response(JSON.stringify({
+      errors: [{
+        code: 5016,
+        message: "AiError: Model Agreement: Thank you for agreeing to this model's terms. You may now use the model."
+      }],
+      success: false,
+      result: {},
+      messages: []
+    }), { status: 403 }),
     new Response(JSON.stringify({
       success: true,
       result: { response: "{\"allowed\":true,\"reason\":\"safe\",\"labels\":[\"safe\"]}" }

@@ -314,6 +314,10 @@ function authLoginRedirect(request: NextRequest) {
 }
 
 async function finalizeResponse(request: NextRequest, response: NextResponse) {
+  if (isNextActionRequest(request) || isRscRequest(request) || isNextInternalRequest(request)) {
+    return response;
+  }
+
   return refreshSupabaseAuth(request, response);
 }
 

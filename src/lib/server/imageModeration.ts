@@ -385,6 +385,22 @@ function classifyCloudflareFailure(
   return fallback;
 }
 
+function cloudflareResponseMessage(responseBody?: string, parsedJson?: unknown) {
+  return failureSearchText(responseBody, parsedJson);
+}
+
+function isLlamaLicenseAcceptedResponse(httpStatus: number, responseBody?: string, parsedJson?: unknown) {
+  const message = cloudflareResponseMessage(responseBody, parsedJson);
+  const codes = collectCloudflareErrorCodes(parsedJson);
+
+  return (
+    httpStatus === 403 &&
+    codes.includes("5016") &&
+    message.includes("thank you for agreeing") &&
+    message.includes("you may now use the model")
+  );
+}
+
 function classifyFetchError(error: unknown): CloudflareFailureKind {
   const name = error instanceof Error ? error.name.toLowerCase() : "";
   const message = error instanceof Error ? error.message.toLowerCase() : "";
@@ -503,17 +519,18 @@ async function agreeToLlamaVisionLicense(input: {
   }, input.model);
   const { responseBody, parsedJson } = await readProviderResponse(response);
   const cloudflareErrorCodes = collectCloudflareErrorCodes(parsedJson);
-  const failureKind = response.ok
+  const accepted = response.ok || isLlamaLicenseAcceptedResponse(response.status, responseBody, parsedJson);
+  const failureKind = accepted
     ? undefined
     : classifyCloudflareFailure(response.status, responseBody, parsedJson);
 
-  logModeration(response.ok ? "info" : "error", "workers_ai_license_response", {
+  logModeration(accepted ? "info" : "error", "workers_ai_license_response", {
     source: input.source,
     provider: input.provider,
     enabled: true,
     required: input.required,
-    allowed: response.ok,
-    reason: response.ok ? "license_accepted" : failureKind,
+    allowed: accepted,
+    reason: accepted ? "license_accepted" : failureKind,
     httpStatus: response.status,
     requestUrl: input.requestUrl,
     model: input.model,
@@ -523,7 +540,7 @@ async function agreeToLlamaVisionLicense(input: {
     failureKind
   });
 
-  if (!response.ok) {
+  if (!accepted) {
     throw new ImageModerationProviderError(input.provider, failureKind || "cloudflare_http_error", {
       httpStatus: response.status,
       requestUrl: input.requestUrl,
