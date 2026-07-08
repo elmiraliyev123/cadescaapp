@@ -3,6 +3,15 @@ import "server-only";
 export type ImageModerationSource = "avatar" | "post";
 
 type ImageModerationProvider = "cloudflare_worker" | "workers_ai_rest" | "none";
+type CloudflareFailureKind =
+  | "authentication_failed"
+  | "cloudflare_http_error"
+  | "image_format_unsupported"
+  | "invalid_payload"
+  | "license_acceptance_required"
+  | "model_unavailable"
+  | "parsing_error"
+  | "timeout";
 
 type ModerationDecision = {
   allowed: boolean;
@@ -14,17 +23,39 @@ type ProviderResult = {
   provider: ImageModerationProvider;
   httpStatus?: number;
   decision: ModerationDecision | null;
+  requestUrl?: string;
+  model?: string;
+  responseBody?: string;
+  parsedJson?: unknown;
+  cloudflareErrorCodes?: string[];
+  failureKind?: CloudflareFailureKind;
 };
 
 class ImageModerationProviderError extends Error {
   provider: ImageModerationProvider;
   httpStatus?: number;
+  requestUrl?: string;
+  model?: string;
+  responseBody?: string;
+  parsedJson?: unknown;
+  cloudflareErrorCodes?: string[];
+  failureKind?: CloudflareFailureKind;
 
-  constructor(provider: ImageModerationProvider, message: string, httpStatus?: number) {
+  constructor(
+    provider: ImageModerationProvider,
+    message: string,
+    details: Omit<ProviderResult, "provider" | "decision"> = {}
+  ) {
     super(message);
     this.name = "ImageModerationProviderError";
     this.provider = provider;
-    this.httpStatus = httpStatus;
+    this.httpStatus = details.httpStatus;
+    this.requestUrl = details.requestUrl;
+    this.model = details.model;
+    this.responseBody = details.responseBody;
+    this.parsedJson = details.parsedJson;
+    this.cloudflareErrorCodes = details.cloudflareErrorCodes;
+    this.failureKind = details.failureKind;
   }
 }
 
@@ -47,6 +78,28 @@ const BLOCKED_LABEL_PATTERNS = [
 
 const IMAGE_EXTENSION_PATTERN = /\.(avif|gif|heic|heif|jpe?g|png|webp)$/i;
 const DEFAULT_TIMEOUT_MS = 10_000;
+const LLAMA_VISION_MODEL = "@cf/meta/llama-3.2-11b-vision-instruct";
+const SUPPORTED_IMAGE_CONTENT_TYPES = new Set([
+  "image/avif",
+  "image/gif",
+  "image/heic",
+  "image/heif",
+  "image/jpeg",
+  "image/jpg",
+  "image/png",
+  "image/webp"
+]);
+const CONTENT_TYPE_BY_EXTENSION: Record<string, string> = {
+  avif: "image/avif",
+  gif: "image/gif",
+  heic: "image/heic",
+  heif: "image/heif",
+  jpeg: "image/jpeg",
+  jpg: "image/jpeg",
+  png: "image/png",
+  webp: "image/webp"
+};
+const llamaLicenseAgreementCache = new Set<string>();
 
 function moderationRequired() {
   return process.env.CLOUDFLARE_IMAGE_MODERATION_REQUIRED === "true";
@@ -59,6 +112,54 @@ function moderationTimeoutMs() {
 
 function fileToBase64(bytes: Uint8Array) {
   return Buffer.from(bytes).toString("base64");
+}
+
+function normalizeDeclaredContentType(contentType: string) {
+  const normalized = contentType.split(";")[0]?.trim().toLowerCase();
+  if (normalized === "image/jpg") return "image/jpeg";
+  return normalized || null;
+}
+
+function imageContentTypeFromName(name: string) {
+  const extension = name.split(".").pop()?.toLowerCase();
+  return extension ? CONTENT_TYPE_BY_EXTENSION[extension] || null : null;
+}
+
+function imageContentTypeFromMagic(bytes: Uint8Array) {
+  if (bytes.length >= 3 && bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff) return "image/jpeg";
+  if (bytes.length >= 8 && bytes[0] === 0x89 && bytes[1] === 0x50 && bytes[2] === 0x4e && bytes[3] === 0x47) return "image/png";
+  if (bytes.length >= 6) {
+    const header = Buffer.from(bytes.subarray(0, 6)).toString("ascii");
+    if (header === "GIF87a" || header === "GIF89a") return "image/gif";
+  }
+  if (bytes.length >= 12) {
+    const riff = Buffer.from(bytes.subarray(0, 4)).toString("ascii");
+    const webp = Buffer.from(bytes.subarray(8, 12)).toString("ascii");
+    if (riff === "RIFF" && webp === "WEBP") return "image/webp";
+  }
+  if (bytes.length >= 12) {
+    const boxType = Buffer.from(bytes.subarray(4, 8)).toString("ascii");
+    const brand = Buffer.from(bytes.subarray(8, 12)).toString("ascii").toLowerCase();
+    if (boxType === "ftyp") {
+      if (brand === "avif" || brand === "avis") return "image/avif";
+      if (["heic", "heix", "hevc", "hevx", "heim", "heis", "mif1", "msf1"].includes(brand)) return "image/heic";
+    }
+  }
+
+  return null;
+}
+
+function normalizeImageContentType(file: File, bytes: Uint8Array) {
+  const declared = normalizeDeclaredContentType(file.type || "");
+  if (declared && SUPPORTED_IMAGE_CONTENT_TYPES.has(declared)) {
+    return declared === "image/jpg" ? "image/jpeg" : declared;
+  }
+
+  return imageContentTypeFromMagic(bytes) || imageContentTypeFromName(file.name || "");
+}
+
+function imageDataUrl(bytes: Uint8Array, contentType: string) {
+  return `data:${contentType};base64,${fileToBase64(bytes)}`;
 }
 
 function labelIsBlocked(label: string) {
@@ -118,8 +219,7 @@ function extractJsonObject(value: string) {
 
 function isLikelyImageFile(file: File, bytes: Uint8Array) {
   if (!bytes.length) return false;
-  const contentType = (file.type || "").toLowerCase();
-  return contentType.startsWith("image/") || IMAGE_EXTENSION_PATTERN.test(file.name || "");
+  return Boolean(normalizeImageContentType(file, bytes) || IMAGE_EXTENSION_PATTERN.test(file.name || ""));
 }
 
 function providerErrorDetails(error: unknown) {
@@ -127,7 +227,13 @@ function providerErrorDetails(error: unknown) {
     return {
       provider: error.provider,
       httpStatus: error.httpStatus,
-      reason: error.message
+      reason: error.message,
+      requestUrl: error.requestUrl,
+      model: error.model,
+      responseBody: error.responseBody,
+      parsedJson: error.parsedJson,
+      cloudflareErrorCodes: error.cloudflareErrorCodes,
+      failureKind: error.failureKind
     };
   }
 
@@ -150,6 +256,12 @@ function logModeration(
     category?: string;
     labels?: string[];
     httpStatus?: number;
+    requestUrl?: string;
+    model?: string;
+    responseBody?: string;
+    parsedJson?: unknown;
+    cloudflareErrorCodes?: string[];
+    failureKind?: CloudflareFailureKind;
   }
 ) {
   const payload = {
@@ -162,7 +274,13 @@ function logModeration(
     reason: details.reason,
     category: details.category,
     labels: details.labels,
-    httpStatus: details.httpStatus
+    httpStatus: details.httpStatus,
+    requestUrl: details.requestUrl,
+    model: details.model,
+    responseBody: details.responseBody,
+    parsedJson: details.parsedJson,
+    cloudflareErrorCodes: details.cloudflareErrorCodes,
+    failureKind: details.failureKind
   };
 
   if (level === "error") {
@@ -178,16 +296,134 @@ function logModeration(
   console.info("[image_moderation]", payload);
 }
 
-async function fetchModeration(provider: ImageModerationProvider, url: string, init: RequestInit) {
+function parseJsonResponseBody(responseBody: string) {
+  if (!responseBody) return null;
+  try {
+    return JSON.parse(responseBody);
+  } catch {
+    return null;
+  }
+}
+
+async function readProviderResponse(response: Response) {
+  const responseBody = await response.text().catch((error) => (
+    error instanceof Error ? `response_body_unreadable:${error.message}` : "response_body_unreadable"
+  ));
+  return {
+    responseBody,
+    parsedJson: parseJsonResponseBody(responseBody)
+  };
+}
+
+function collectCloudflareErrorCodes(value: unknown) {
+  const codes: string[] = [];
+  const collect = (item: unknown) => {
+    if (!item || typeof item !== "object") return;
+    const record = item as Record<string, unknown>;
+    const code = record.code ?? record.errorCode ?? record.error_code;
+    if (typeof code === "string" || typeof code === "number") {
+      codes.push(String(code));
+      return;
+    }
+    if (typeof record.message === "string") {
+      codes.push(record.message);
+    }
+  };
+
+  if (value && typeof value === "object") {
+    const record = value as Record<string, unknown>;
+    if (Array.isArray(record.errors)) record.errors.forEach(collect);
+    if (Array.isArray(record.messages)) record.messages.forEach(collect);
+    collect(record.error);
+  }
+
+  return Array.from(new Set(codes));
+}
+
+function failureSearchText(responseBody?: string, parsedJson?: unknown) {
+  const jsonText = parsedJson ? JSON.stringify(parsedJson) : "";
+  return `${responseBody || ""} ${jsonText}`.toLowerCase();
+}
+
+function classifyCloudflareFailure(
+  httpStatus: number | undefined,
+  responseBody?: string,
+  parsedJson?: unknown,
+  fallback: CloudflareFailureKind = "cloudflare_http_error"
+): CloudflareFailureKind {
+  const text = failureSearchText(responseBody, parsedJson);
+
+  if (text.includes("timeout") || text.includes("timed out")) return "timeout";
+  if (text.includes("unsupported") && (text.includes("image") || text.includes("format") || text.includes("decode"))) {
+    return "image_format_unsupported";
+  }
+  if (
+    text.includes("license") ||
+    text.includes("acceptable use") ||
+    text.includes("acceptance") ||
+    text.includes("\"prompt\"") && text.includes("agree")
+  ) {
+    return "license_acceptance_required";
+  }
+  if (httpStatus === 401) return "authentication_failed";
+  if (
+    httpStatus === 403 &&
+    (text.includes("auth") || text.includes("token") || text.includes("permission") || text.includes("forbidden") || text.includes("unauthorized"))
+  ) {
+    return "authentication_failed";
+  }
+  if (httpStatus === 404 || httpStatus === 410 || text.includes("model not found") || text.includes("model unavailable")) {
+    return "model_unavailable";
+  }
+  if (httpStatus === 400 || httpStatus === 415 || httpStatus === 422 || text.includes("invalid payload") || text.includes("schema")) {
+    return "invalid_payload";
+  }
+  if (httpStatus === 408 || httpStatus === 504) {
+    return "timeout";
+  }
+
+  return fallback;
+}
+
+function classifyFetchError(error: unknown): CloudflareFailureKind {
+  const name = error instanceof Error ? error.name.toLowerCase() : "";
+  const message = error instanceof Error ? error.message.toLowerCase() : "";
+  if (name.includes("abort") || name.includes("timeout") || message.includes("timeout") || message.includes("timed out")) {
+    return "timeout";
+  }
+  return "cloudflare_http_error";
+}
+
+function extractWorkersAiResponseText(payload: unknown) {
+  if (!payload || typeof payload !== "object") return null;
+  const record = payload as Record<string, unknown>;
+  const result = record.result;
+  if (typeof result === "string") return result;
+  if (result && typeof result === "object") {
+    const resultRecord = result as Record<string, unknown>;
+    for (const key of ["response", "text", "answer"]) {
+      if (typeof resultRecord[key] === "string") return resultRecord[key];
+    }
+  }
+  return null;
+}
+
+async function fetchModeration(provider: ImageModerationProvider, url: string, init: RequestInit, model?: string) {
   try {
     return await fetch(url, {
       ...init,
       signal: AbortSignal.timeout(moderationTimeoutMs())
     });
   } catch (error) {
+    const failureKind = classifyFetchError(error);
     throw new ImageModerationProviderError(
       provider,
-      error instanceof Error ? error.message : "request_failed"
+      failureKind,
+      {
+        requestUrl: url,
+        model,
+        failureKind
+      }
     );
   }
 }
@@ -216,17 +452,177 @@ async function moderateWithCloudflareWorker(input: {
       imageBase64: fileToBase64(input.bytes)
     })
   });
+  const { responseBody, parsedJson } = await readProviderResponse(response);
+  const cloudflareErrorCodes = collectCloudflareErrorCodes(parsedJson);
 
   if (!response.ok) {
-    throw new ImageModerationProviderError(provider, "cloudflare_http_error", response.status);
+    const failureKind = classifyCloudflareFailure(response.status, responseBody, parsedJson);
+    throw new ImageModerationProviderError(provider, failureKind, {
+      httpStatus: response.status,
+      requestUrl: endpoint,
+      responseBody,
+      parsedJson,
+      cloudflareErrorCodes,
+      failureKind
+    });
   }
 
-  const payload = await response.json().catch(() => null);
   return {
     provider,
     httpStatus: response.status,
-    decision: normalizeDecision(payload)
+    decision: normalizeDecision(parsedJson),
+    requestUrl: endpoint,
+    responseBody,
+    parsedJson,
+    cloudflareErrorCodes
   };
+}
+
+function shouldTryLlamaVisionLicenseAgreement(model: string, failureKind: CloudflareFailureKind) {
+  if (process.env.CLOUDFLARE_WORKERS_AI_ACCEPT_LICENSE_ON_403 === "false") return false;
+  if (!model.includes("llama-3.2-11b-vision-instruct")) return false;
+  if (llamaLicenseAgreementCache.has(model)) return false;
+  return failureKind === "license_acceptance_required";
+}
+
+async function agreeToLlamaVisionLicense(input: {
+  provider: ImageModerationProvider;
+  requestUrl: string;
+  model: string;
+  token: string;
+  source: ImageModerationSource;
+  required: boolean;
+}) {
+  const response = await fetchModeration(input.provider, input.requestUrl, {
+    method: "POST",
+    headers: {
+      authorization: `Bearer ${input.token}`,
+      "content-type": "application/json"
+    },
+    body: JSON.stringify({ prompt: "agree" })
+  }, input.model);
+  const { responseBody, parsedJson } = await readProviderResponse(response);
+  const cloudflareErrorCodes = collectCloudflareErrorCodes(parsedJson);
+  const failureKind = response.ok
+    ? undefined
+    : classifyCloudflareFailure(response.status, responseBody, parsedJson);
+
+  logModeration(response.ok ? "info" : "error", "workers_ai_license_response", {
+    source: input.source,
+    provider: input.provider,
+    enabled: true,
+    required: input.required,
+    allowed: response.ok,
+    reason: response.ok ? "license_accepted" : failureKind,
+    httpStatus: response.status,
+    requestUrl: input.requestUrl,
+    model: input.model,
+    responseBody,
+    parsedJson,
+    cloudflareErrorCodes,
+    failureKind
+  });
+
+  if (!response.ok) {
+    throw new ImageModerationProviderError(input.provider, failureKind || "cloudflare_http_error", {
+      httpStatus: response.status,
+      requestUrl: input.requestUrl,
+      model: input.model,
+      responseBody,
+      parsedJson,
+      cloudflareErrorCodes,
+      failureKind
+    });
+  }
+
+  llamaLicenseAgreementCache.add(input.model);
+}
+
+async function runWorkersAiModerationRequest(input: {
+  bytes: Uint8Array;
+  contentType: string;
+  source: ImageModerationSource;
+  provider: ImageModerationProvider;
+  requestUrl: string;
+  model: string;
+  token: string;
+  required: boolean;
+}) {
+  const response = await fetchModeration(input.provider, input.requestUrl, {
+    method: "POST",
+    headers: {
+      authorization: `Bearer ${input.token}`,
+      "content-type": "application/json"
+    },
+    body: JSON.stringify({
+      image: imageDataUrl(input.bytes, input.contentType),
+      max_tokens: 180,
+      temperature: 0,
+      prompt:
+        "Classify this image for a university social app. Return only valid compact JSON with exactly these keys: " +
+        "{\"allowed\":boolean,\"reason\":string,\"labels\":string[]}. " +
+        "Set allowed=false for pornographic, sexually explicit, nude, violent, weapon, blood, gore, self-harm, or graphic content."
+    })
+  }, input.model);
+  const { responseBody, parsedJson } = await readProviderResponse(response);
+  const cloudflareErrorCodes = collectCloudflareErrorCodes(parsedJson);
+
+  logModeration(response.ok ? "info" : "error", "workers_ai_response", {
+    source: input.source,
+    provider: input.provider,
+    enabled: true,
+    required: input.required,
+    allowed: response.ok,
+    reason: response.ok ? "response_received" : classifyCloudflareFailure(response.status, responseBody, parsedJson),
+    httpStatus: response.status,
+    requestUrl: input.requestUrl,
+    model: input.model,
+    responseBody,
+    parsedJson,
+    cloudflareErrorCodes,
+    failureKind: response.ok ? undefined : classifyCloudflareFailure(response.status, responseBody, parsedJson)
+  });
+
+  if (!response.ok) {
+    const failureKind = classifyCloudflareFailure(response.status, responseBody, parsedJson);
+    throw new ImageModerationProviderError(input.provider, failureKind, {
+      httpStatus: response.status,
+      requestUrl: input.requestUrl,
+      model: input.model,
+      responseBody,
+      parsedJson,
+      cloudflareErrorCodes,
+      failureKind
+    });
+  }
+
+  const rawResponse = extractWorkersAiResponseText(parsedJson);
+  const decision = rawResponse
+    ? normalizeDecision(extractJsonObject(rawResponse))
+    : normalizeDecision((parsedJson as { result?: unknown } | null)?.result);
+
+  if (!decision) {
+    throw new ImageModerationProviderError(input.provider, "parsing_error", {
+      httpStatus: response.status,
+      requestUrl: input.requestUrl,
+      model: input.model,
+      responseBody,
+      parsedJson,
+      cloudflareErrorCodes,
+      failureKind: "parsing_error"
+    });
+  }
+
+  return {
+    provider: input.provider,
+    httpStatus: response.status,
+    decision,
+    requestUrl: input.requestUrl,
+    model: input.model,
+    responseBody,
+    parsedJson,
+    cloudflareErrorCodes
+  } satisfies ProviderResult;
 }
 
 async function moderateWithWorkersAiRest(input: {
@@ -239,39 +635,44 @@ async function moderateWithWorkersAiRest(input: {
   if (!accountId || !token) return null;
 
   const provider = "workers_ai_rest";
-  const model = process.env.CLOUDFLARE_IMAGE_MODERATION_MODEL?.trim() || "@cf/meta/llama-3.2-11b-vision-instruct";
-  const response = await fetchModeration(provider, `https://api.cloudflare.com/client/v4/accounts/${accountId}/ai/run/${model}`, {
-    method: "POST",
-    headers: {
-      authorization: `Bearer ${token}`,
-      "content-type": "application/json"
-    },
-    body: JSON.stringify({
-      image: Array.from(input.bytes),
-      max_tokens: 180,
-      temperature: 0,
-      prompt:
-        "Classify this image for a university social app. Return only compact JSON: " +
-        "{\"allowed\":boolean,\"reason\":string,\"labels\":string[]}. " +
-        "Set allowed=false for pornographic, sexually explicit, nude, violent, weapon, blood, gore, self-harm, or graphic content."
-    })
-  });
+  const model = process.env.CLOUDFLARE_IMAGE_MODERATION_MODEL?.trim() || LLAMA_VISION_MODEL;
+  const requestUrl = `https://api.cloudflare.com/client/v4/accounts/${accountId}/ai/run/${model}`;
+  const required = moderationRequired();
 
-  if (!response.ok) {
-    throw new ImageModerationProviderError(provider, "cloudflare_http_error", response.status);
+  try {
+    return await runWorkersAiModerationRequest({
+      ...input,
+      provider,
+      requestUrl,
+      model,
+      token,
+      required
+    });
+  } catch (error) {
+    if (
+      error instanceof ImageModerationProviderError &&
+      shouldTryLlamaVisionLicenseAgreement(model, error.failureKind || "cloudflare_http_error")
+    ) {
+      await agreeToLlamaVisionLicense({
+        provider,
+        requestUrl,
+        model,
+        token,
+        source: input.source,
+        required
+      });
+      return runWorkersAiModerationRequest({
+        ...input,
+        provider,
+        requestUrl,
+        model,
+        token,
+        required
+      });
+    }
+
+    throw error;
   }
-
-  const payload = await response.json().catch(() => null) as { result?: { response?: string }; success?: boolean } | null;
-  const rawResponse = payload?.result?.response;
-  if (!payload?.success || typeof rawResponse !== "string") {
-    throw new ImageModerationProviderError(provider, "cloudflare_invalid_response", response.status);
-  }
-
-  return {
-    provider,
-    httpStatus: response.status,
-    decision: normalizeDecision(extractJsonObject(rawResponse))
-  };
 }
 
 async function runConfiguredProvider(input: {
@@ -304,7 +705,9 @@ export async function assertImageAllowed(file: File, source: ImageModerationSour
     throw new Error("image_moderation_failed");
   }
 
-  if (!isLikelyImageFile(file, bytes)) {
+  const contentType = normalizeImageContentType(file, bytes);
+
+  if (!contentType || !isLikelyImageFile(file, bytes)) {
     logModeration("warn", "invalid_input", {
       source,
       provider: "none",
@@ -321,7 +724,7 @@ export async function assertImageAllowed(file: File, source: ImageModerationSour
   try {
     result = await runConfiguredProvider({
       bytes,
-      contentType: file.type || "application/octet-stream",
+      contentType,
       filename: file.name || "upload",
       source
     });
@@ -334,7 +737,13 @@ export async function assertImageAllowed(file: File, source: ImageModerationSour
       required,
       allowed: false,
       reason: details.reason,
-      httpStatus: details.httpStatus
+      httpStatus: details.httpStatus,
+      requestUrl: details.requestUrl,
+      model: details.model,
+      responseBody: details.responseBody,
+      parsedJson: details.parsedJson,
+      cloudflareErrorCodes: details.cloudflareErrorCodes,
+      failureKind: details.failureKind
     });
 
     if (required) {
@@ -367,7 +776,13 @@ export async function assertImageAllowed(file: File, source: ImageModerationSour
       required,
       allowed: !required,
       reason: "no_parseable_decision",
-      httpStatus: result.httpStatus
+      httpStatus: result.httpStatus,
+      requestUrl: result.requestUrl,
+      model: result.model,
+      responseBody: result.responseBody,
+      parsedJson: result.parsedJson,
+      cloudflareErrorCodes: result.cloudflareErrorCodes,
+      failureKind: result.failureKind
     });
 
     if (required) {
@@ -388,7 +803,12 @@ export async function assertImageAllowed(file: File, source: ImageModerationSour
     reason: result.decision.reason || (blocked ? "policy" : "safe"),
     category,
     labels: result.decision.labels || [],
-    httpStatus: result.httpStatus
+    httpStatus: result.httpStatus,
+    requestUrl: result.requestUrl,
+    model: result.model,
+    responseBody: result.responseBody,
+    parsedJson: result.parsedJson,
+    cloudflareErrorCodes: result.cloudflareErrorCodes
   });
 
   if (blocked) {
