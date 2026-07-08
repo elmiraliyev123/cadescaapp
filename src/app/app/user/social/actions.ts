@@ -9,7 +9,8 @@ import {
   deleteOwnUniversityPost,
   reportUniversityPost,
   toggleUserFollow,
-  toggleUniversityPostLike
+  toggleUniversityPostLike,
+  uploadUniversityPostImage
 } from "@/lib/server/social";
 
 export type SocialFormState = {
@@ -35,22 +36,34 @@ function revalidateSocialPaths() {
 function friendlyMessage(error: unknown) {
   const message = error instanceof Error ? error.message : "";
   if (message === "verified_university_student_required") {
-    return "Verified university access is required.";
+    return "social.verifiedAccessRequired";
   }
-  if (message === "post_body_required") return "Write something before posting.";
-  if (message === "post_body_too_long") return "Your post is too long.";
-  if (message === "invalid_image_url") return "Use a valid http or https image URL.";
-  if (message === "profile_not_found") return "That profile could not be found.";
-  if (message === "cannot_follow_self") return "You cannot follow yourself.";
-  return "The action could not be completed.";
+  if (message === "post_body_required") return "social.postBodyRequired";
+  if (message === "post_body_too_long") return "social.postBodyTooLong";
+  if (message === "invalid_image_url") return "social.invalidImageUrl";
+  if (message === "invalid_post_image_type") return "social.invalidPostImageType";
+  if (message === "post_image_file_too_large") return "social.postImageTooLarge";
+  if (message === "post_image_upload_failed" || message === "post_image_bucket_missing") return "social.postImageUploadFailed";
+  if (message === "image_rejected") return "social.imageRejected";
+  if (message === "image_moderation_failed") return "social.imageScanFailed";
+  if (message === "profile_not_found") return "social.profileNotFound";
+  if (message === "cannot_follow_self") return "social.cannotFollowSelf";
+  return "social.actionFailed";
+}
+
+function getFirstUploadedFile(formData: FormData, name: string) {
+  return formData.getAll(name).find((value): value is File => value instanceof File && value.size > 0) || null;
 }
 
 export async function createPostAction(_previous: SocialFormState, formData: FormData): Promise<SocialFormState> {
   const shouldRedirect = formData.get("redirectToHome") === "true";
   try {
+    const imageFile = getFirstUploadedFile(formData, "imageFile");
+    const imagePath = imageFile ? await uploadUniversityPostImage(imageFile) : null;
     await createUniversityPost({
       body: String(formData.get("body") || ""),
-      imageUrl: String(formData.get("imageUrl") || "")
+      imageUrl: String(formData.get("imageUrl") || ""),
+      imagePath
     });
     revalidateSocialPaths();
   } catch (error) {
@@ -61,7 +74,7 @@ export async function createPostAction(_previous: SocialFormState, formData: For
     redirect("/app/user/home");
   }
 
-  return { ok: true, message: "Post published." };
+  return { ok: true, message: "social.postPublished" };
 }
 
 export async function togglePostLikeAction(formData: FormData) {
@@ -78,7 +91,7 @@ export async function addPostCommentAction(_previous: SocialFormState, formData:
     if (!postId) throw new Error("post_not_found");
     await createUniversityPostComment({ postId, body });
     revalidateSocialPaths();
-    return { ok: true, message: "Comment added." };
+    return { ok: true, message: "social.commentAdded" };
   } catch (error) {
     return { ok: false, message: friendlyMessage(error) };
   }

@@ -10,6 +10,10 @@ export const LOCALE_COOKIE_MAX_AGE = 60 * 60 * 24 * 365;
 
 export const LOCALE_HEADER = "x-cadesca-locale";
 
+export function getLocaleCookieDomain() {
+  return process.env.NODE_ENV === "production" ? LOCALE_COOKIE_DOMAIN : undefined;
+}
+
 export function countryToLocale(countryCode: string | null | undefined): SupportedLocale {
   switch ((countryCode || "").toUpperCase()) {
     case "TR":

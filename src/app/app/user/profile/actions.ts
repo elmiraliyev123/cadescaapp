@@ -4,9 +4,9 @@ import { revalidatePath } from "next/cache";
 import { cookies } from "next/headers";
 
 import {
+  getLocaleCookieDomain,
   isSupportedLocale,
   LANGUAGE_BANNER_DISMISSED_COOKIE_NAME,
-  LOCALE_COOKIE_DOMAIN,
   LOCALE_COOKIE_MAX_AGE,
   NEXT_LOCALE_COOKIE_NAME,
   type SupportedLocale
@@ -27,18 +27,24 @@ export type ProfileSettingsFormState = {
 
 function profileSettingsMessage(error: unknown) {
   const message = error instanceof Error ? error.message : "";
-  if (message === "username_required") return "Choose a username.";
-  if (message === "invalid_username") return "Use 3-30 lowercase letters, numbers, underscores, or dots.";
-  if (message === "reserved_username") return "That username is reserved.";
-  if (message === "username_taken") return "That username is already taken.";
-  if (message === "display_name_too_long") return "Display name must be 80 characters or less.";
-  if (message === "bio_too_long") return "Bio must be 240 characters or less.";
-  if (message === "invalid_avatar_type") return "Upload a JPG, PNG, or WebP image.";
-  if (message === "avatar_file_too_large") return "Avatar image must be 3 MB or less.";
-  if (message === "avatar_bucket_missing") return "The avatars storage bucket is not configured.";
-  if (message === "avatar_upload_requires_supabase_auth") return "Sign in again before uploading an avatar.";
-  if (message === "avatar_upload_failed") return "Avatar upload failed.";
-  return "Profile settings could not be saved.";
+  if (message === "username_required") return "social.chooseUsername";
+  if (message === "invalid_username") return "social.invalidUsername";
+  if (message === "reserved_username") return "social.reservedUsername";
+  if (message === "username_taken") return "social.usernameTaken";
+  if (message === "display_name_too_long") return "social.displayNameTooLong";
+  if (message === "bio_too_long") return "social.bioTooLong";
+  if (message === "invalid_avatar_type") return "social.invalidAvatarType";
+  if (message === "avatar_file_too_large") return "social.avatarTooLarge";
+  if (message === "avatar_bucket_missing") return "social.avatarBucketMissing";
+  if (message === "avatar_upload_requires_supabase_auth") return "social.avatarUploadAuth";
+  if (message === "avatar_upload_failed") return "social.avatarUploadFailed";
+  if (message === "image_rejected") return "social.imageRejected";
+  if (message === "image_moderation_failed") return "social.imageScanFailed";
+  return "social.profileSettingsFailed";
+}
+
+function getFirstUploadedFile(formData: FormData, name: string) {
+  return formData.getAll(name).find((value): value is File => value instanceof File && value.size > 0) || null;
 }
 
 export async function updateProfileSettingsAction(
@@ -46,8 +52,8 @@ export async function updateProfileSettingsAction(
   formData: FormData
 ): Promise<ProfileSettingsFormState> {
   try {
-    const avatar = formData.get("avatar");
-    const avatarPath = avatar instanceof File && avatar.size > 0 ? await uploadCurrentUserAvatar(avatar) : null;
+    const avatar = getFirstUploadedFile(formData, "avatar");
+    const avatarPath = avatar ? await uploadCurrentUserAvatar(avatar) : null;
 
     await updateCurrentUserProfile({
       displayName: String(formData.get("displayName") || ""),
@@ -63,7 +69,7 @@ export async function updateProfileSettingsAction(
     revalidatePath("/app/user/explore");
     if (username) revalidatePath(`/user/${username}`);
 
-    return { ok: true, message: "Profile settings saved." };
+    return { ok: true, message: "social.profileSaved" };
   } catch (error) {
     return { ok: false, message: profileSettingsMessage(error) };
   }
@@ -115,11 +121,15 @@ export async function updateLanguagePreference(locale: SupportedLocale): Promise
       throw new Error("unauthorized");
     }
 
-    await updateUserLocale(legacySession.id, locale);
+    if (process.env.NODE_ENV === "development" && legacySession.id === "user_mock") {
+      // The local demo user is not stored in the production users table.
+    } else {
+      await updateUserLocale(legacySession.id, locale);
+    }
   }
 
   const cookieOptions = {
-    domain: LOCALE_COOKIE_DOMAIN,
+    domain: getLocaleCookieDomain(),
     path: "/",
     maxAge: LOCALE_COOKIE_MAX_AGE,
     sameSite: "lax" as const,

@@ -4,8 +4,8 @@ import type { NextRequest } from "next/server";
 import { verifyUserSessionToken, USER_SESSION_COOKIE } from "@/lib/server/userSession";
 import { updateUserLocale } from "@/lib/server/users";
 import {
+  getLocaleCookieDomain,
   isSupportedLocale,
-  LOCALE_COOKIE_DOMAIN,
   LOCALE_COOKIE_MAX_AGE,
   NEXT_LOCALE_COOKIE_NAME
 } from "@/lib/localization";
@@ -55,7 +55,7 @@ export async function POST(request: NextRequest) {
   const response = NextResponse.json({ success: true, locale });
 
   response.cookies.set(NEXT_LOCALE_COOKIE_NAME, locale, {
-    domain: LOCALE_COOKIE_DOMAIN,
+    domain: getLocaleCookieDomain(),
     path: "/",
     maxAge: LOCALE_COOKIE_MAX_AGE,
     sameSite: "lax",

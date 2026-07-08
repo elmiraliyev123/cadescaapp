@@ -2,6 +2,7 @@ import "server-only";
 
 import { cookies } from "next/headers";
 
+import { assertImageAllowed } from "@/lib/server/imageModeration";
 import { USER_SESSION_COOKIE, verifyUserSessionToken } from "@/lib/server/userSession";
 import { getReadyPool } from "@/lib/server/users";
 import { ensureUniversitySchemaReady, normalizeEmailDomains, normalizeUniversitySlug } from "@/lib/server/universities";
@@ -251,6 +252,20 @@ type CommentRow = {
 };
 
 const AVATAR_BUCKET = "avatars";
+const SOCIAL_IMAGE_BUCKET = "social-images";
+const MAX_AVATAR_FILE_BYTES = 8 * 1024 * 1024;
+const MAX_POST_IMAGE_FILE_BYTES = 10 * 1024 * 1024;
+const SUPPORTED_IMAGE_EXTENSIONS = new Set(["jpg", "jpeg", "png", "webp", "heic", "heif", "avif", "gif"]);
+const EXTENSION_BY_MIME_TYPE: Record<string, string> = {
+  "image/jpeg": "jpg",
+  "image/jpg": "jpg",
+  "image/png": "png",
+  "image/webp": "webp",
+  "image/heic": "heic",
+  "image/heif": "heif",
+  "image/avif": "avif",
+  "image/gif": "gif"
+};
 const USERNAME_PATTERN = /^[a-z0-9_][a-z0-9_.]{1,28}[a-z0-9_]$/;
 const RESERVED_USERNAMES = new Set([
   "admin",
@@ -282,7 +297,7 @@ function isHttpUrl(value: string | null | undefined) {
   return Boolean(value && /^https?:\/\//i.test(value));
 }
 
-async function resolveAvatarUrls(values: Array<string | null | undefined>) {
+async function resolveStorageUrls(bucket: string, values: Array<string | null | undefined>, logScope: string) {
   const result = new Map<string, string | null>();
   const objectPaths = Array.from(new Set(values.filter((value): value is string => Boolean(value && !isHttpUrl(value)))));
 
@@ -297,7 +312,7 @@ async function resolveAvatarUrls(values: Array<string | null | undefined>) {
   try {
     const { data, error } = await getSupabaseAdminClient()
       .storage
-      .from(AVATAR_BUCKET)
+      .from(bucket)
       .createSignedUrls(objectPaths, 60 * 60);
 
     if (error) throw error;
@@ -308,7 +323,7 @@ async function resolveAvatarUrls(values: Array<string | null | undefined>) {
       }
     }
   } catch (error) {
-    console.error("[avatars] signed_url_failed", {
+    console.error(`[${logScope}] signed_url_failed`, {
       reason: error instanceof Error ? error.message : "unknown"
     });
     for (const path of objectPaths) {
@@ -317,6 +332,14 @@ async function resolveAvatarUrls(values: Array<string | null | undefined>) {
   }
 
   return result;
+}
+
+async function resolveAvatarUrls(values: Array<string | null | undefined>) {
+  return resolveStorageUrls(AVATAR_BUCKET, values, "avatars");
+}
+
+async function resolvePostImageUrls(values: Array<string | null | undefined>) {
+  return resolveStorageUrls(SOCIAL_IMAGE_BUCKET, values, "post_images");
 }
 
 async function resolveAvatarUrl(value: string | null | undefined) {
@@ -557,6 +580,27 @@ function normalizeOptionalImageUrl(value: FormDataEntryValue | string | null | u
   }
 }
 
+function getImageExtension(file: File) {
+  const mimeExtension = EXTENSION_BY_MIME_TYPE[(file.type || "").toLowerCase()];
+  if (mimeExtension) return mimeExtension;
+
+  const filenameExtension = (file.name || "").split(".").pop()?.toLowerCase();
+  if (filenameExtension && SUPPORTED_IMAGE_EXTENSIONS.has(filenameExtension)) {
+    return filenameExtension === "jpeg" ? "jpg" : filenameExtension;
+  }
+
+  return null;
+}
+
+function validateImageFile(file: File, maxBytes: number, invalidTypeError: string, tooLargeError: string) {
+  if (!file || file.size === 0) return null;
+  if (file.size > maxBytes) throw new Error(tooLargeError);
+
+  const extension = getImageExtension(file);
+  if (!extension) throw new Error(invalidTypeError);
+  return extension;
+}
+
 function normalizeDisplayName(value: FormDataEntryValue | string | null | undefined) {
   const displayName = String(value || "").trim();
   if (!displayName) return null;
@@ -619,7 +663,8 @@ function mapPost(
   row: PostRow,
   comments: SocialComment[],
   currentUserId: string,
-  avatarUrls: Map<string, string | null>
+  avatarUrls: Map<string, string | null>,
+  imageUrls: Map<string, string | null>
 ): SocialPost {
   return {
     id: row.id,
@@ -631,7 +676,7 @@ function mapPost(
     universityName: row.university_name,
     universitySlug: row.university_slug,
     body: row.body,
-    imageUrl: row.image_url,
+    imageUrl: row.image_url ? imageUrls.get(row.image_url) || null : null,
     status: row.status,
     createdAt: iso(row.created_at) || "",
     updatedAt: iso(row.updated_at) || "",
@@ -693,7 +738,8 @@ export async function listUniversityFeed(user: CurrentStudentContext, limit = 50
 
   const comments = await loadCommentsForPosts(result.rows.map((row) => row.id), user.id);
   const avatarUrls = await resolveAvatarUrls(result.rows.map((row) => row.author_avatar_url));
-  return result.rows.map((row) => mapPost(row, comments.get(row.id) || [], user.id, avatarUrls));
+  const imageUrls = await resolvePostImageUrls(result.rows.map((row) => row.image_url));
+  return result.rows.map((row) => mapPost(row, comments.get(row.id) || [], user.id, avatarUrls, imageUrls));
 }
 
 export async function listExplorePosts(user: CurrentStudentContext, limit = 20) {
@@ -752,7 +798,8 @@ async function listUserPostsForViewer(
 
   const comments = await loadCommentsForPosts(result.rows.map((row) => row.id), viewer.id);
   const avatarUrls = await resolveAvatarUrls(result.rows.map((row) => row.author_avatar_url));
-  return result.rows.map((row) => mapPost(row, comments.get(row.id) || [], viewer.id, avatarUrls));
+  const imageUrls = await resolvePostImageUrls(result.rows.map((row) => row.image_url));
+  return result.rows.map((row) => mapPost(row, comments.get(row.id) || [], viewer.id, avatarUrls, imageUrls));
 }
 
 export async function getPublicProfileByUsername(usernameInput: string): Promise<PublicStudentProfile | null> {
@@ -926,12 +973,12 @@ export async function getStudentProfileStats(user: CurrentStudentContext | null)
   };
 }
 
-export async function createUniversityPost(input: { body: string; imageUrl?: string | null }) {
+export async function createUniversityPost(input: { body: string; imageUrl?: string | null; imagePath?: string | null }) {
   const user = await getCurrentStudentContext();
   requireVerifiedUniversityStudent(user);
 
   const body = normalizePostBody(input.body, 1000);
-  const imageUrl = normalizeOptionalImageUrl(input.imageUrl);
+  const imageUrl = input.imagePath || normalizeOptionalImageUrl(input.imageUrl);
   const pool = await getReadyPool();
 
   await pool.query(
@@ -941,41 +988,52 @@ export async function createUniversityPost(input: { body: string; imageUrl?: str
   );
 }
 
+export async function uploadUniversityPostImage(file: File) {
+  const user = await getCurrentStudentContext();
+  requireVerifiedUniversityStudent(user);
+
+  const extension = validateImageFile(file, MAX_POST_IMAGE_FILE_BYTES, "invalid_post_image_type", "post_image_file_too_large");
+  if (!extension) return null;
+
+  await assertImageAllowed(file, "post");
+
+  const objectPath = `${user.universityId}/${user.id}/${crypto.randomUUID()}.${extension}`;
+  const { error } = await getSupabaseAdminClient()
+    .storage
+    .from(SOCIAL_IMAGE_BUCKET)
+    .upload(objectPath, file, {
+      cacheControl: "3600",
+      contentType: file.type || `image/${extension === "jpg" ? "jpeg" : extension}`,
+      upsert: false
+    });
+
+  if (error) {
+    const message = error.message.toLowerCase();
+    if (message.includes("bucket") || message.includes("not found")) {
+      throw new Error("post_image_bucket_missing");
+    }
+    throw new Error("post_image_upload_failed");
+  }
+
+  return objectPath;
+}
+
 export async function uploadCurrentUserAvatar(file: File) {
   const user = await getCurrentStudentContext();
   requireActiveUser(user);
 
-  if (!user.authUserId) {
-    throw new Error("avatar_upload_requires_supabase_auth");
-  }
+  const extension = validateImageFile(file, MAX_AVATAR_FILE_BYTES, "invalid_avatar_type", "avatar_file_too_large");
+  if (!extension) return null;
 
-  if (!file || file.size === 0) return null;
-  if (file.size > 3 * 1024 * 1024) throw new Error("avatar_file_too_large");
-
-  const extensionByType: Record<string, string> = {
-    "image/jpeg": "jpg",
-    "image/png": "png",
-    "image/webp": "webp"
-  };
-  const extension = extensionByType[file.type];
-  if (!extension) throw new Error("invalid_avatar_type");
-
-  const supabase = await createSupabaseServerClient();
-  const {
-    data: { user: authUser }
-  } = await supabase.auth.getUser();
-
-  if (!authUser || authUser.id !== user.authUserId) {
-    throw new Error("unauthorized");
-  }
+  await assertImageAllowed(file, "avatar");
 
   const objectPath = `${user.id}/avatar.${extension}`;
-  const { error } = await supabase
+  const { error } = await getSupabaseAdminClient()
     .storage
     .from(AVATAR_BUCKET)
     .upload(objectPath, file, {
       cacheControl: "3600",
-      contentType: file.type,
+      contentType: file.type || `image/${extension === "jpg" ? "jpeg" : extension}`,
       upsert: true
     });
 
@@ -1326,10 +1384,11 @@ export async function listAdminModerationPosts(limit = 100) {
   );
 
   const avatarUrls = await resolveAvatarUrls(result.rows.map((row) => row.author_avatar_url));
+  const imageUrls = await resolvePostImageUrls(result.rows.map((row) => row.image_url));
   return result.rows.map<AdminModerationPost>((row) => ({
     id: row.id,
     body: row.body,
-    imageUrl: row.image_url,
+    imageUrl: row.image_url ? imageUrls.get(row.image_url) || null : null,
     status: row.status,
     createdAt: iso(row.created_at) || "",
     updatedAt: iso(row.updated_at) || "",

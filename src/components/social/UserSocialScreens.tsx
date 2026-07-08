@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useActionState, useId, useOptimistic, useState, useTransition } from "react";
+import { useActionState, useEffect, useId, useRef, useState, useTransition } from "react";
 import { useFormStatus } from "react-dom";
 import { useRouter } from "next/navigation";
 
@@ -36,17 +36,25 @@ import { cn } from "@/lib/utils";
 const EMPTY_FORM_STATE: SocialFormState = { ok: false, message: "" };
 const EMPTY_PROFILE_SETTINGS_STATE: ProfileSettingsFormState = { ok: false, message: "" };
 const POST_MAX_LENGTH = 1000;
+const NATIVE_IMAGE_ACCEPT = "image/*,image/jpeg,image/png,image/webp,image/heic,image/heif,image/avif,image/gif,.jpg,.jpeg,.png,.webp,.heic,.heif,.avif,.gif";
 
 const LANGUAGE_OPTIONS: ReadonlyArray<{ value: Language; label: string }> = [
-  { value: "az", label: "Azerbaycan dili" },
-  { value: "tr", label: "Turkce" },
+  { value: "az", label: "Azərbaycan dili" },
+  { value: "tr", label: "Türkçe" },
   { value: "en", label: "English" },
-  { value: "ru", label: "Russian" }
+  { value: "ru", label: "Русский" }
 ];
 
-function formatDateTime(value: string | null | undefined) {
+const DATE_LOCALES: Record<Language, string> = {
+  az: "az-AZ",
+  en: "en-US",
+  ru: "ru-RU",
+  tr: "tr-TR"
+};
+
+function formatDateTime(value: string | null | undefined, language: Language = "en") {
   if (!value) return "-";
-  return new Intl.DateTimeFormat("en-US", {
+  return new Intl.DateTimeFormat(DATE_LOCALES[language], {
     month: "short",
     day: "numeric",
     hour: "2-digit",
@@ -54,15 +62,19 @@ function formatDateTime(value: string | null | undefined) {
   }).format(new Date(value));
 }
 
-function campusCommunityName(user: CurrentStudentContext | null | undefined) {
+function campusCommunityName(user: CurrentStudentContext | null | undefined, fallback = "Cadesca campus") {
   const university = user?.universityName || user?.legacyUniversityName;
-  if (!university) return "Cadesca campus";
+  if (!university) return fallback;
   return `Cadesca x ${university.replace(/ University$/i, "")}`;
 }
 
-function initials(name: string | null | undefined) {
-  const parts = (name || "Cadesca Student").trim().split(/\s+/).slice(0, 2);
+function initials(name: string | null | undefined, fallback = "Cadesca Student") {
+  const parts = (name || fallback).trim().split(/\s+/).slice(0, 2);
   return parts.map((part) => part[0]?.toUpperCase()).join("") || "CS";
+}
+
+function translatedMessage(t: ReturnType<typeof useLanguage>["t"], message: string) {
+  return message.startsWith("social.") ? t(message as Parameters<typeof t>[0]) : message;
 }
 
 function SocialPageHeader({
@@ -102,6 +114,7 @@ function Avatar({
     lg: "h-16 w-16 text-title-lg",
     xl: "h-20 w-20 text-headline-md"
   };
+  const { t } = useLanguage();
 
   return (
     <div
@@ -111,12 +124,117 @@ function Avatar({
         inverse ? "bg-primary text-on-primary" : "bg-surface-container-low text-primary"
       )}
     >
-      {src ? <img src={src} alt="" className="h-full w-full object-cover" /> : initials(name)}
+      {src ? <img src={src} alt="" className="h-full w-full object-cover" /> : initials(name, t("social.defaultStudentName"))}
+    </div>
+  );
+}
+
+function ImageUploadPicker({
+  name,
+  currentUrl,
+  compact = false,
+  capture = "environment",
+  helpText
+}: {
+  name: string;
+  currentUrl?: string | null;
+  compact?: boolean;
+  capture?: "user" | "environment";
+  helpText: string;
+}) {
+  const { t } = useLanguage();
+  const libraryInputRef = useRef<HTMLInputElement | null>(null);
+  const cameraInputRef = useRef<HTMLInputElement | null>(null);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(currentUrl || null);
+  const [selectedName, setSelectedName] = useState("");
+
+  useEffect(() => {
+    setPreviewUrl(currentUrl || null);
+  }, [currentUrl]);
+
+  useEffect(() => {
+    return () => {
+      if (previewUrl?.startsWith("blob:")) URL.revokeObjectURL(previewUrl);
+    };
+  }, [previewUrl]);
+
+  function setFile(file: File | undefined, otherInput: HTMLInputElement | null) {
+    if (!file) return;
+    if (otherInput) otherInput.value = "";
+    setPreviewUrl((previous) => {
+      if (previous?.startsWith("blob:")) URL.revokeObjectURL(previous);
+      return URL.createObjectURL(file);
+    });
+    setSelectedName(file.name || t("social.photoSelected"));
+  }
+
+  function clearFile() {
+    if (libraryInputRef.current) libraryInputRef.current.value = "";
+    if (cameraInputRef.current) cameraInputRef.current.value = "";
+    setSelectedName("");
+    setPreviewUrl((previous) => {
+      if (previous?.startsWith("blob:")) URL.revokeObjectURL(previous);
+      return currentUrl || null;
+    });
+  }
+
+  return (
+    <div className={cn("rounded-2xl border border-outline-variant/30 bg-surface-container-lowest p-3", compact && "p-2.5")}>
+      <input
+        ref={libraryInputRef}
+        name={name}
+        type="file"
+        accept={NATIVE_IMAGE_ACCEPT}
+        className="hidden"
+        onChange={(event) => setFile(event.target.files?.[0], cameraInputRef.current)}
+      />
+      <input
+        ref={cameraInputRef}
+        name={name}
+        type="file"
+        accept={NATIVE_IMAGE_ACCEPT}
+        capture={capture}
+        className="hidden"
+        onChange={(event) => setFile(event.target.files?.[0], libraryInputRef.current)}
+      />
+
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+        <div className={cn("flex min-w-0 flex-1 items-center gap-3", compact && "gap-2")}>
+          <div className={cn("flex shrink-0 items-center justify-center overflow-hidden rounded-xl border border-outline-variant/20 bg-surface-container-low", compact ? "h-12 w-12" : "h-16 w-16")}>
+            {previewUrl ? (
+              <img src={previewUrl} alt="" className="h-full w-full object-cover" />
+            ) : (
+              <span className="material-symbols-outlined text-[22px] text-secondary" aria-hidden="true">add_photo_alternate</span>
+            )}
+          </div>
+          <div className="min-w-0">
+            <p className="truncate text-caption font-semibold text-primary">
+              {selectedName || (previewUrl ? t("social.profilePhoto") : t("social.addPhoto"))}
+            </p>
+            <p className="mt-0.5 line-clamp-2 text-caption text-secondary">{helpText}</p>
+          </div>
+        </div>
+
+        <div className="flex flex-wrap gap-2">
+          <Button type="button" size="sm" variant="secondary" icon="upload" onClick={() => libraryInputRef.current?.click()}>
+            {previewUrl ? t("social.replacePhoto") : t("social.addPhoto")}
+          </Button>
+          <Button type="button" size="sm" variant="quiet" icon="photo_camera" onClick={() => cameraInputRef.current?.click()}>
+            {t("social.takePhoto")}
+          </Button>
+          {selectedName ? (
+            <Button type="button" size="sm" variant="ghost" icon="close" onClick={clearFile}>
+              {t("social.removePhoto")}
+            </Button>
+          ) : null}
+        </div>
+      </div>
     </div>
   );
 }
 
 function VerifiedBadge() {
+  const { t } = useLanguage();
   const [open, setOpen] = useState(false);
   const tooltipId = useId();
 
@@ -124,8 +242,8 @@ function VerifiedBadge() {
     <span className="relative inline-flex">
       <button
         type="button"
-        className="inline-flex h-7 w-7 items-center justify-center rounded-full text-primary transition-colors hover:bg-surface-container-low focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30"
-        aria-label="Verified student badge"
+        className="inline-flex h-5 w-5 items-center justify-center rounded-full text-primary transition-colors hover:bg-surface-container-low focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30"
+        aria-label={t("social.verifiedBadgeLabel")}
         aria-describedby={open ? tooltipId : undefined}
         aria-expanded={open}
         onClick={() => setOpen((value) => !value)}
@@ -134,15 +252,21 @@ function VerifiedBadge() {
         onMouseEnter={() => setOpen(true)}
         onMouseLeave={() => setOpen(false)}
       >
-        <span className="material-symbols-outlined material-symbols-filled text-[21px]" aria-hidden="true">verified</span>
+        <span
+          className="material-symbols-outlined material-symbols-filled leading-none"
+          style={{ fontSize: 16 }}
+          aria-hidden="true"
+        >
+          verified
+        </span>
       </button>
       {open ? (
         <span
           id={tooltipId}
           role="tooltip"
-          className="absolute left-0 top-9 z-20 w-64 rounded-xl border border-outline-variant/30 bg-surface-container-lowest p-3 text-caption font-semibold text-secondary shadow-soft"
+          className="absolute left-0 top-7 z-20 w-64 rounded-xl border border-outline-variant/30 bg-surface-container-lowest p-3 text-caption font-semibold text-secondary shadow-soft"
         >
-          This badge means your student status has been verified by Cadesca.
+          {t("social.verifiedBadgeTooltip")}
         </span>
       ) : null}
     </span>
@@ -154,20 +278,21 @@ function isVerifiedStudent(user: CurrentStudentContext | null): user is CurrentS
 }
 
 function VerificationGate({ user }: { user: CurrentStudentContext | null }) {
-  let title = "Student verification required";
-  let detail = "Your campus feed opens after your student verification is approved.";
+  const { t } = useLanguage();
+  let title = t("social.studentVerificationRequiredTitle");
+  let detail = t("social.studentVerificationRequiredDetail");
   let icon = "verified_user";
 
   if (!user) {
-    title = "Sign in required";
-    detail = "Your session could not be verified.";
+    title = t("social.signInRequiredTitle");
+    detail = t("social.signInRequiredDetail");
   } else if (!user.socialReady) {
-    title = "Campus community is almost ready";
-    detail = "We're setting up your private university space. Please check back soon.";
+    title = t("social.campusAlmostReadyTitle");
+    detail = t("social.campusAlmostReadyDetail");
     icon = "hourglass_empty";
   } else if (!user.universityId) {
-    title = "Campus community is almost ready";
-    detail = "Your verified account is waiting for its university space.";
+    title = t("social.campusAlmostReadyTitle");
+    detail = t("social.campusWaitingDetail");
     icon = "school";
   }
 
@@ -183,7 +308,7 @@ function VerificationGate({ user }: { user: CurrentStudentContext | null }) {
           href="/app/user/profile"
           className="inline-flex h-10 items-center justify-center rounded-lg border border-primary bg-primary px-4 text-label-md font-semibold text-on-primary"
         >
-          Go to Profile
+          {t("social.goToProfile")}
         </Link>
       </div>
     </div>
@@ -191,13 +316,15 @@ function VerificationGate({ user }: { user: CurrentStudentContext | null }) {
 }
 
 export function SocialUnavailableScreen({ message: _message }: { message?: string }) {
+  const { t } = useLanguage();
+
   return (
     <section>
-      <SocialPageHeader title="Home" subtitle="Cadesca university community" />
+      <SocialPageHeader title={t("social.homeTitle")} subtitle={t("social.defaultCampus")} />
       <div className="mx-auto max-w-xl rounded-2xl border border-outline-variant/30 bg-surface-container-lowest p-6 text-center shadow-[0_1px_3px_rgba(0,0,0,0.04)]">
         <span className="material-symbols-outlined text-[28px] text-primary" aria-hidden="true">hourglass_empty</span>
-        <h2 className="mt-3 text-headline-md font-semibold text-primary">Campus community is almost ready</h2>
-        <p className="mt-2 text-body-md text-secondary">We're setting up your private university space. Please check back soon.</p>
+        <h2 className="mt-3 text-headline-md font-semibold text-primary">{t("social.campusAlmostReadyTitle")}</h2>
+        <p className="mt-2 text-body-md text-secondary">{t("social.campusAlmostReadyDetail")}</p>
       </div>
     </section>
   );
@@ -212,11 +339,13 @@ function PostComposer({
   redirectAfterPost?: boolean;
   user: CurrentStudentContext;
 }) {
+  const { t } = useLanguage();
   const [state, formAction, isPending] = useActionState(createPostAction, EMPTY_FORM_STATE);
   const [body, setBody] = useState("");
   const authorName = user.displayName || user.name;
-  const placeholder = compact ? "What's happening at Bilkent?" : "What do you want to share?";
-  const community = campusCommunityName(user);
+  const placeholder = compact ? t("social.postCompactPlaceholder") : t("social.postPlaceholder");
+  const community = campusCommunityName(user, t("social.defaultCampus"));
+  const statusMessage = state.message ? translatedMessage(t, state.message) : `${t("social.visibleToVerified")} ${community}.`;
 
   return (
     <form action={formAction} className="rounded-2xl border border-outline-variant/30 bg-surface-container-lowest p-4 shadow-[0_1px_3px_rgba(0,0,0,0.04)]">
@@ -244,27 +373,30 @@ function PostComposer({
               compact ? "min-h-20" : "min-h-36"
             )}
           />
+          <div className="mt-3">
+            <ImageUploadPicker name="imageFile" compact helpText={t("social.postPhotoHelp")} />
+          </div>
           <div className="mt-3 flex flex-col gap-3 sm:flex-row sm:items-center">
             <label className="flex min-w-0 flex-1 items-center gap-2 rounded-full border border-outline-variant/30 bg-surface-container-lowest px-3 py-2">
               <span className="material-symbols-outlined text-[18px] text-secondary" aria-hidden="true">image</span>
-              <span className="sr-only">Optional image URL</span>
+              <span className="sr-only">{t("social.imageUrlLabel")}</span>
               <input
                 name="imageUrl"
                 type="url"
-                placeholder="Add image URL"
+                placeholder={t("social.imageUrlPlaceholder")}
                 className="h-6 min-w-0 flex-1 bg-transparent text-caption font-semibold text-primary outline-none placeholder:text-secondary"
               />
             </label>
             <div className="flex shrink-0 items-center justify-between gap-3 sm:justify-end">
               <span className="text-caption font-semibold text-secondary">{body.length}/{POST_MAX_LENGTH}</span>
               <Button type="submit" icon="send" disabled={isPending}>
-                {isPending ? "Posting" : "Post"}
+                {isPending ? t("social.posting") : t("social.post")}
               </Button>
             </div>
           </div>
           <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
             <p className={cn("text-caption font-semibold", state.message ? (state.ok ? "text-primary" : "text-secondary") : "text-secondary")}>
-              {state.message || `Visible to verified students in ${community}.`}
+              {statusMessage}
             </p>
           </div>
         </div>
@@ -304,6 +436,7 @@ function ActionIconButton({
 }
 
 function CommentForm({ postId }: { postId: string }) {
+  const { t } = useLanguage();
   const [state, formAction, isPending] = useActionState(addPostCommentAction, EMPTY_FORM_STATE);
 
   return (
@@ -312,18 +445,19 @@ function CommentForm({ postId }: { postId: string }) {
       <input
         name="body"
         maxLength={500}
-        placeholder="Write a comment"
+        placeholder={t("social.writeComment")}
         className="h-10 min-w-0 flex-1 rounded-lg border border-outline-variant/30 bg-surface-container-lowest px-3 text-label-md text-primary outline-none transition focus:border-primary"
       />
       <Button type="submit" size="sm" variant="secondary" icon="chat_bubble" disabled={isPending}>
-        {isPending ? "Sending" : "Reply"}
+        {isPending ? t("social.sending") : t("social.reply")}
       </Button>
-      {state.message ? <p className="sr-only" role="status">{state.message}</p> : null}
+      {state.message ? <p className="sr-only" role="status">{translatedMessage(t, state.message)}</p> : null}
     </form>
   );
 }
 
 function SocialPostCard({ post }: { post: SocialPost }) {
+  const { language, t } = useLanguage();
   const [commentsOpen, setCommentsOpen] = useState(post.comments.length > 0);
 
   return (
@@ -345,21 +479,21 @@ function SocialPostCard({ post }: { post: SocialPost }) {
               </div>
               <p className="mt-0.5 text-caption font-medium text-secondary">
                 {post.authorUsername ? `@${post.authorUsername} · ` : ""}
-                {post.universityName} · {formatDateTime(post.createdAt)}
+                {post.universityName} · {formatDateTime(post.createdAt, language)}
               </p>
             </div>
           </div>
           {post.ownPost ? (
             <form action={deletePostAction}>
               <input type="hidden" name="postId" value={post.id} />
-              <ActionIconButton icon="delete" title="Delete post" />
+              <ActionIconButton icon="delete" title={t("social.deletePost")} />
             </form>
           ) : (
             <form action={reportPostAction}>
               <input type="hidden" name="postId" value={post.id} />
-              <input type="hidden" name="reason" value="Reported from feed" />
-              <ActionIconButton icon="flag" title="Report post">
-                Report
+              <input type="hidden" name="reason" value={t("social.reportedFromFeed")} />
+              <ActionIconButton icon="flag" title={t("social.reportPost")}>
+                {t("social.report")}
               </ActionIconButton>
             </form>
           )}
@@ -376,7 +510,7 @@ function SocialPostCard({ post }: { post: SocialPost }) {
         <div className="mt-3 flex flex-wrap items-center gap-1 border-t border-outline-variant/20 pt-2">
           <form action={togglePostLikeAction}>
             <input type="hidden" name="postId" value={post.id} />
-            <ActionIconButton icon="favorite" active={post.likedByCurrentUser} title="Like post">
+            <ActionIconButton icon="favorite" active={post.likedByCurrentUser} title={t("social.likePost")}>
               {post.likeCount}
             </ActionIconButton>
           </form>
@@ -391,10 +525,10 @@ function SocialPostCard({ post }: { post: SocialPost }) {
           <button
             type="button"
             className="inline-flex h-9 items-center gap-1.5 rounded-full border border-transparent px-3 text-caption font-semibold text-secondary transition-colors hover:bg-surface-container-low hover:text-primary"
-            title="Share"
+            title={t("social.share")}
           >
             <span className="material-symbols-outlined text-[18px]" aria-hidden="true">ios_share</span>
-            <span>Share</span>
+            <span>{t("social.share")}</span>
           </button>
         </div>
 
@@ -416,7 +550,7 @@ function SocialPostCard({ post }: { post: SocialPost }) {
                         )}
                         <p className="text-caption text-secondary">
                           {comment.authorUsername ? `@${comment.authorUsername} · ` : ""}
-                          {formatDateTime(comment.createdAt)}
+                          {formatDateTime(comment.createdAt, language)}
                         </p>
                       </div>
                       <p className="mt-1 whitespace-pre-wrap break-words text-label-md text-primary">{comment.body}</p>
@@ -435,8 +569,8 @@ function SocialPostCard({ post }: { post: SocialPost }) {
 
 function FeedList({
   posts,
-  emptyTitle = "Be the first to post",
-  emptyDescription = "Start the first campus conversation.",
+  emptyTitle,
+  emptyDescription,
   showCreateAction = false
 }: {
   posts: SocialPost[];
@@ -444,19 +578,23 @@ function FeedList({
   emptyDescription?: string;
   showCreateAction?: boolean;
 }) {
+  const { t } = useLanguage();
+  const title = emptyTitle || t("social.emptyFirstPostTitle");
+  const description = emptyDescription || t("social.emptyFirstPostDescription");
+
   if (!posts.length) {
     return (
       <div className="rounded-2xl border border-outline-variant/30 bg-surface-container-lowest p-6 text-center shadow-[0_1px_3px_rgba(0,0,0,0.04)]">
         <span className="material-symbols-outlined text-[28px] text-primary" aria-hidden="true">forum</span>
-        <h2 className="mt-3 text-headline-md font-semibold text-primary">{emptyTitle}</h2>
-        <p className="mt-2 text-body-md text-secondary">{emptyDescription}</p>
+        <h2 className="mt-3 text-headline-md font-semibold text-primary">{title}</h2>
+        <p className="mt-2 text-body-md text-secondary">{description}</p>
         {showCreateAction ? (
           <Link
             href="/app/user/create"
             className="mt-5 inline-flex h-10 items-center justify-center gap-2 rounded-lg border border-primary bg-primary px-4 text-label-md font-semibold text-on-primary"
           >
             <span className="material-symbols-outlined text-[18px]" aria-hidden="true">add</span>
-            Create post
+            {t("social.createPost")}
           </Link>
         ) : null}
       </div>
@@ -473,12 +611,13 @@ function FeedList({
 }
 
 export function HomeFeedScreen({ user, posts }: { user: CurrentStudentContext | null; posts: SocialPost[] }) {
-  const universityLabel = campusCommunityName(user);
+  const { t } = useLanguage();
+  const universityLabel = campusCommunityName(user, t("social.defaultCampus"));
 
   return (
     <section>
       <SocialPageHeader
-        title="Home"
+        title={t("social.homeTitle")}
         subtitle={universityLabel}
       />
       {isVerifiedStudent(user) ? (
@@ -486,8 +625,8 @@ export function HomeFeedScreen({ user, posts }: { user: CurrentStudentContext | 
           <PostComposer compact user={user} />
           <FeedList
             posts={posts}
-            emptyTitle="Be the first to post"
-            emptyDescription="Share something with verified students from your university."
+            emptyTitle={t("social.emptyFirstPostTitle")}
+            emptyDescription={t("social.emptyHomeDescription")}
             showCreateAction
           />
         </div>
@@ -500,47 +639,51 @@ export function HomeFeedScreen({ user, posts }: { user: CurrentStudentContext | 
 
 const exploreFeatureCards: ReadonlyArray<{
   icon: string;
-  title: string;
-  description: string;
+  titleKey: Parameters<ReturnType<typeof useLanguage>["t"]>[0];
+  descriptionKey: Parameters<ReturnType<typeof useLanguage>["t"]>[0];
   imageUrl: string;
 }> = [
   {
     icon: "home_work",
-    title: "Roommate Finder",
-    description: "Find verified students looking for roommates.",
+    titleKey: "social.featureRoommateTitle",
+    descriptionKey: "social.featureRoommateDescription",
     imageUrl: "https://images.unsplash.com/photo-1522202176988-66273c2fd55f?auto=format&fit=crop&w=1400&q=82"
   },
   {
     icon: "favorite",
-    title: "MatchMe",
-    description: "Opt-in campus matching for verified students.",
+    titleKey: "social.featureMatchTitle",
+    descriptionKey: "social.featureMatchDescription",
     imageUrl: "https://images.unsplash.com/photo-1529333166437-7750a6dd5a70?auto=format&fit=crop&w=1400&q=82"
   },
   {
     icon: "event_available",
-    title: "Events",
-    description: "Discover campus events and join what matters.",
+    titleKey: "social.featureEventsTitle",
+    descriptionKey: "social.featureEventsDescription",
     imageUrl: "https://images.unsplash.com/photo-1470229722913-7c0e2dbbafd3?auto=format&fit=crop&w=1400&q=82"
   },
   {
     icon: "local_mall",
-    title: "Marketplace",
-    description: "Buy, sell and trade within your campus.",
+    titleKey: "social.featureMarketplaceTitle",
+    descriptionKey: "social.featureMarketplaceDescription",
     imageUrl: "https://images.unsplash.com/photo-1523275335684-37898b6baf30?auto=format&fit=crop&w=1400&q=82"
   }
 ];
 
 function ExploreFeatureCard({
   icon,
-  title,
-  description,
+  titleKey,
+  descriptionKey,
   imageUrl
 }: {
   icon: string;
-  title: string;
-  description: string;
+  titleKey: Parameters<ReturnType<typeof useLanguage>["t"]>[0];
+  descriptionKey: Parameters<ReturnType<typeof useLanguage>["t"]>[0];
   imageUrl: string;
 }) {
+  const { t } = useLanguage();
+  const title = t(titleKey);
+  const description = t(descriptionKey);
+
   return (
     <article className="group relative h-36 overflow-hidden rounded-[1.65rem] bg-primary text-on-primary shadow-[0_8px_24px_rgba(0,0,0,0.16)] sm:h-[220px]">
       <img
@@ -564,7 +707,7 @@ function ExploreFeatureCard({
           </p>
         </div>
         <span className="absolute bottom-5 right-5 inline-flex h-10 items-center justify-center rounded-2xl border border-white/60 bg-white/90 px-5 text-label-md font-bold text-primary shadow-[inset_0_0_0_1px_rgba(0,0,0,0.12),0_8px_18px_rgba(0,0,0,0.20)] backdrop-blur sm:h-11 sm:px-6 sm:text-label-lg">
-          Soon
+          {t("social.soon")}
         </span>
       </div>
     </article>
@@ -572,25 +715,27 @@ function ExploreFeatureCard({
 }
 
 export function ExploreScreen({ user, posts }: { user: CurrentStudentContext | null; posts: SocialPost[] }) {
+  const { t } = useLanguage();
+
   return (
     <section>
-      <SocialPageHeader title="Explore" subtitle={`${campusCommunityName(user)} launchpad`} />
+      <SocialPageHeader title={t("social.exploreTitle")} subtitle={`${campusCommunityName(user, t("social.defaultCampus"))} ${t("social.launchpad")}`} />
       {isVerifiedStudent(user) ? (
         <div className="mx-auto max-w-3xl space-y-6">
           <div className="grid gap-3 sm:gap-4">
             {exploreFeatureCards.map((card) => (
-              <ExploreFeatureCard key={card.title} {...card} />
+              <ExploreFeatureCard key={card.titleKey} {...card} />
             ))}
           </div>
           <div>
             <div className="mb-3 flex items-center justify-between gap-3">
-              <h2 className="text-headline-md font-semibold text-primary">Campus Posts</h2>
-              <Badge tone="muted">{posts.length} posts</Badge>
+              <h2 className="text-headline-md font-semibold text-primary">{t("social.campusPosts")}</h2>
+              <Badge tone="muted">{posts.length} {t("social.postsCount")}</Badge>
             </div>
             <FeedList
               posts={posts}
-              emptyTitle="No trends yet"
-              emptyDescription="Campus posts will surface here as students start sharing."
+              emptyTitle={t("social.noTrendsTitle")}
+              emptyDescription={t("social.noTrendsDescription")}
             />
           </div>
         </div>
@@ -602,9 +747,11 @@ export function ExploreScreen({ user, posts }: { user: CurrentStudentContext | n
 }
 
 export function CreatePostScreen({ user }: { user: CurrentStudentContext | null }) {
+  const { t } = useLanguage();
+
   return (
     <section>
-      <SocialPageHeader title="Create post" subtitle={`Share with ${campusCommunityName(user)}`} />
+      <SocialPageHeader title={t("social.createPostTitle")} subtitle={`${t("social.shareWith")} ${campusCommunityName(user, t("social.defaultCampus"))}`} />
       {isVerifiedStudent(user) ? (
         <div className="mx-auto max-w-2xl">
           <PostComposer user={user} redirectAfterPost />
@@ -623,9 +770,11 @@ export function ActivityScreen({
   user: CurrentStudentContext | null;
   items: SocialActivityItem[];
 }) {
+  const { language, t } = useLanguage();
+
   return (
     <section>
-      <SocialPageHeader title="Activity" subtitle="Likes, comments, follows, and replies" />
+      <SocialPageHeader title={t("social.activityTitle")} subtitle={t("social.activitySubtitle")} />
       {isVerifiedStudent(user) ? (
         <div className="mx-auto max-w-3xl space-y-3">
           {items.length ? items.map((item) => (
@@ -638,7 +787,7 @@ export function ActivityScreen({
                 </div>
                 <div className="min-w-0">
                   <p className="text-label-md font-semibold text-primary">
-                    {item.actorName} {item.type === "like" ? "liked your post" : item.type === "follow" ? "followed you" : "commented on your post"}
+                    {item.actorName} {item.type === "like" ? t("social.likedYourPost") : item.type === "follow" ? t("social.followedYou") : t("social.commentedOnPost")}
                   </p>
                   {item.actorUsername && item.type === "follow" ? (
                     <p className="mt-1 text-body-sm font-semibold text-secondary">@{item.actorUsername}</p>
@@ -648,15 +797,15 @@ export function ActivityScreen({
                       {item.commentBody || item.postPreview}
                     </p>
                   ) : null}
-                  <p className="mt-2 text-caption text-secondary">{formatDateTime(item.createdAt)}</p>
+                  <p className="mt-2 text-caption text-secondary">{formatDateTime(item.createdAt, language)}</p>
                 </div>
               </div>
             </div>
           )) : (
             <div className="rounded-2xl border border-outline-variant/30 bg-surface-container-lowest p-6 text-center shadow-[0_1px_3px_rgba(0,0,0,0.04)]">
               <span className="material-symbols-outlined text-[28px] text-primary" aria-hidden="true">notifications</span>
-              <h2 className="mt-3 text-headline-md font-semibold text-primary">No activity yet</h2>
-              <p className="mt-2 text-body-md text-secondary">Likes, comments, follows, and replies will appear here.</p>
+              <h2 className="mt-3 text-headline-md font-semibold text-primary">{t("social.noActivityTitle")}</h2>
+              <p className="mt-2 text-body-md text-secondary">{t("social.noActivityDescription")}</p>
             </div>
           )}
         </div>
@@ -669,22 +818,30 @@ export function ActivityScreen({
 
 function LanguageSettings() {
   const router = useRouter();
-  const { language, t } = useLanguage();
-  const [selectedLanguage, setSelectedLanguage] = useOptimistic(language);
+  const { language, setLanguage, t } = useLanguage();
+  const [selectedLanguage, setSelectedLanguage] = useState(language);
   const [message, setMessage] = useState("");
   const [isPending, startTransition] = useTransition();
 
+  useEffect(() => {
+    setSelectedLanguage(language);
+  }, [language]);
+
   function changeLanguage(locale: Language) {
+    const previousLanguage = language;
     setMessage("");
+    setSelectedLanguage(locale);
+    setLanguage(locale);
 
     startTransition(async () => {
-      setSelectedLanguage(locale);
       try {
         await updateLanguagePreference(locale);
-        setMessage("Language preference saved.");
+        setMessage(t("social.languageSaved"));
         router.refresh();
       } catch {
-        setMessage("Language preference could not be saved.");
+        setSelectedLanguage(previousLanguage);
+        setLanguage(previousLanguage);
+        setMessage(t("social.languageFailed"));
       }
     });
   }
@@ -712,8 +869,9 @@ function LanguageSettings() {
   );
 }
 
-function LogoutCard() {
+function LogoutCard({ className }: { className?: string }) {
   const router = useRouter();
+  const { t } = useLanguage();
   const [pending, startTransition] = useTransition();
 
   function logout() {
@@ -724,14 +882,14 @@ function LogoutCard() {
   }
 
   return (
-    <div className="premium-card p-5">
+    <div className={cn("premium-card p-5", className)}>
       <div className="flex items-center justify-between gap-4">
         <div>
-          <h2 className="text-label-lg font-semibold text-primary">Account</h2>
-          <p className="mt-1 text-body-sm text-secondary">Cadesca student session</p>
+          <h2 className="text-label-lg font-semibold text-primary">{t("social.account")}</h2>
+          <p className="mt-1 text-body-sm text-secondary">{t("social.session")}</p>
         </div>
         <Button variant="secondary" icon="logout" disabled={pending} onClick={logout}>
-          {pending ? "Logging out" : "Log out"}
+          {pending ? t("social.loggingOut") : t("social.logOut")}
         </Button>
       </div>
     </div>
@@ -739,17 +897,19 @@ function LogoutCard() {
 }
 
 function AccountDetailsCard({ user }: { user: CurrentStudentContext }) {
+  const { t } = useLanguage();
+
   return (
     <div className="premium-card p-5">
-      <h2 className="text-label-lg font-semibold text-primary">Account details</h2>
+      <h2 className="text-label-lg font-semibold text-primary">{t("social.accountDetails")}</h2>
       <div className="mt-4 space-y-3 text-label-md">
         <div className="flex items-center justify-between gap-3">
-          <span className="text-secondary">Email</span>
+          <span className="text-secondary">{t("common.email")}</span>
           <span className="min-w-0 break-words text-right font-semibold text-primary">{user.email}</span>
         </div>
         <div className="flex items-center justify-between gap-3">
-          <span className="text-secondary">University</span>
-          <span className="text-right font-semibold text-primary">{user.universityName || user.legacyUniversityName || "Not assigned"}</span>
+          <span className="text-secondary">{t("social.university")}</span>
+          <span className="text-right font-semibold text-primary">{user.universityName || user.legacyUniversityName || t("social.notAssigned")}</span>
         </div>
       </div>
     </div>
@@ -757,37 +917,46 @@ function AccountDetailsCard({ user }: { user: CurrentStudentContext }) {
 }
 
 function SettingsSaveButton() {
+  const { t } = useLanguage();
   const { pending } = useFormStatus();
   return (
     <Button type="submit" icon="check" disabled={pending}>
-      {pending ? "Saving" : "Save changes"}
+      {pending ? t("social.saving") : t("social.saveChanges")}
     </Button>
   );
 }
 
 export function ProfileSettingsScreen({ user }: { user: CurrentStudentContext | null }) {
+  const { t } = useLanguage();
   const [state, formAction] = useActionState(updateProfileSettingsAction, EMPTY_PROFILE_SETTINGS_STATE);
-  const profileName = user?.displayName || user?.name || "Cadesca Student";
+  const profileName = user?.displayName || user?.name || t("social.defaultStudentName");
+  const formMessage = state.message ? translatedMessage(t, state.message) : t("social.changesApply");
 
   return (
     <section>
-      <ScreenHeader title="Settings" description="Profile and account preferences" />
+      <ScreenHeader title={t("social.settingsTitle")} description={t("social.settingsDescription")} />
       {user ? (
         <div className="mx-auto grid max-w-5xl gap-5 xl:grid-cols-[minmax(0,1fr)_340px]">
-          <form action={formAction} encType="multipart/form-data" className="premium-card p-5">
-            <div className="flex flex-wrap items-center gap-4 border-b border-outline-variant/20 pb-5">
-              <Avatar name={profileName} src={user.avatarUrl} size="xl" inverse />
-              <div className="min-w-0">
-                <h2 className="break-words text-headline-md font-semibold text-primary">{profileName}</h2>
-                <p className="mt-1 text-body-md font-semibold text-secondary">
-                  {user.username ? `@${user.username}` : "@username pending"}
-                </p>
+          <form action={formAction} encType="multipart/form-data" className="premium-card overflow-hidden p-0">
+            <div className="border-b border-outline-variant/20 p-5">
+              <div className="flex flex-wrap items-center gap-4">
+                <Avatar name={profileName} src={user.avatarUrl} size="xl" inverse />
+                <div className="min-w-0">
+                  <p className="text-caption font-semibold uppercase text-secondary">{t("social.profilePhoto")}</p>
+                  <h2 className="mt-1 break-words text-headline-md font-semibold text-primary">{profileName}</h2>
+                  <p className="mt-1 text-body-md font-semibold text-secondary">
+                    {user.username ? `@${user.username}` : t("social.usernamePending")}
+                  </p>
+                </div>
+              </div>
+              <div className="mt-4">
+                <ImageUploadPicker name="avatar" currentUrl={user.avatarUrl} capture="user" helpText={t("social.avatarPhotoHelp")} />
               </div>
             </div>
 
-            <div className="mt-5 grid gap-4">
+            <div className="grid gap-4 p-5">
               <label className="block">
-                <span className="mb-2 block text-caption font-semibold uppercase text-secondary">Display name</span>
+                <span className="mb-2 block text-caption font-semibold uppercase text-secondary">{t("social.displayName")}</span>
                 <input
                   name="displayName"
                   defaultValue={user.displayName || user.name}
@@ -797,7 +966,7 @@ export function ProfileSettingsScreen({ user }: { user: CurrentStudentContext | 
               </label>
 
               <label className="block">
-                <span className="mb-2 block text-caption font-semibold uppercase text-secondary">Username</span>
+                <span className="mb-2 block text-caption font-semibold uppercase text-secondary">{t("social.username")}</span>
                 <div className="flex h-11 items-center rounded-lg border border-outline-variant/30 bg-surface-container-lowest focus-within:border-primary">
                   <span className="pl-4 text-label-md font-semibold text-secondary">@</span>
                   <input
@@ -813,7 +982,7 @@ export function ProfileSettingsScreen({ user }: { user: CurrentStudentContext | 
               </label>
 
               <label className="block">
-                <span className="mb-2 block text-caption font-semibold uppercase text-secondary">Bio</span>
+                <span className="mb-2 block text-caption font-semibold uppercase text-secondary">{t("social.bio")}</span>
                 <textarea
                   name="bio"
                   defaultValue={user.bio || ""}
@@ -823,19 +992,9 @@ export function ProfileSettingsScreen({ user }: { user: CurrentStudentContext | 
                 />
               </label>
 
-              <label className="block">
-                <span className="mb-2 block text-caption font-semibold uppercase text-secondary">Profile photo</span>
-                <input
-                  name="avatar"
-                  type="file"
-                  accept="image/jpeg,image/png,image/webp"
-                  className="block w-full rounded-lg border border-outline-variant/30 bg-surface-container-lowest px-4 py-3 text-label-md text-primary file:mr-4 file:rounded-md file:border-0 file:bg-primary file:px-3 file:py-2 file:text-caption file:font-semibold file:text-on-primary"
-                />
-              </label>
-
               <div className="flex flex-wrap items-center justify-between gap-3 border-t border-outline-variant/20 pt-4">
                 <p className={cn("text-caption font-semibold", state.message ? (state.ok ? "text-primary" : "text-secondary") : "text-secondary")}>
-                  {state.message || "Changes apply to your campus profile."}
+                  {formMessage}
                 </p>
                 <SettingsSaveButton />
               </div>
@@ -845,7 +1004,7 @@ export function ProfileSettingsScreen({ user }: { user: CurrentStudentContext | 
           <aside className="space-y-5">
             <AccountDetailsCard user={user} />
             <LanguageSettings />
-            <LogoutCard />
+            <LogoutCard className="md:hidden" />
           </aside>
         </div>
       ) : (
@@ -856,15 +1015,18 @@ export function ProfileSettingsScreen({ user }: { user: CurrentStudentContext | 
 }
 
 function FollowSubmitButton({ isFollowing }: { isFollowing: boolean }) {
+  const { t } = useLanguage();
   const { pending } = useFormStatus();
   return (
     <Button type="submit" variant={isFollowing ? "secondary" : "primary"} icon={isFollowing ? "person_remove" : "person_add"} disabled={pending}>
-      {pending ? "Updating" : isFollowing ? "Unfollow" : "Follow"}
+      {pending ? t("social.updating") : isFollowing ? t("social.unfollow") : t("social.follow")}
     </Button>
   );
 }
 
 export function PublicProfileScreen({ profile }: { profile: PublicStudentProfile }) {
+  const { t } = useLanguage();
+
   return (
     <section className="mx-auto min-h-dvh max-w-4xl px-margin-mobile py-6 md:px-margin-tablet">
       <ScreenHeader
@@ -876,7 +1038,7 @@ export function PublicProfileScreen({ profile }: { profile: PublicStudentProfile
             className="inline-flex h-10 items-center justify-center gap-2 rounded-lg border border-outline-variant/30 bg-surface-container-lowest px-4 text-label-md font-semibold text-primary transition-colors hover:bg-surface-container-low"
           >
             <span className="material-symbols-outlined text-[18px]" aria-hidden="true">arrow_back</span>
-            Home
+            {t("social.homeTitle")}
           </Link>
         }
       />
@@ -908,7 +1070,7 @@ export function PublicProfileScreen({ profile }: { profile: PublicStudentProfile
                 className="inline-flex h-11 items-center justify-center gap-2 rounded-lg border border-outline-variant/30 bg-surface-container-lowest px-4 text-label-md font-semibold text-primary transition-colors hover:bg-surface-container-low"
               >
                 <span className="material-symbols-outlined text-[18px]" aria-hidden="true">settings</span>
-                Settings
+                {t("social.settingsTitle")}
               </Link>
             )}
           </div>
@@ -916,28 +1078,28 @@ export function PublicProfileScreen({ profile }: { profile: PublicStudentProfile
 
         <div className="grid gap-3 sm:grid-cols-3">
           <div className="premium-card p-4">
-            <p className="text-caption font-semibold uppercase text-secondary">Posts</p>
+            <p className="text-caption font-semibold uppercase text-secondary">{t("social.posts")}</p>
             <p className="mt-2 text-headline-md font-semibold text-primary">{profile.postsCount}</p>
           </div>
           <div className="premium-card p-4">
-            <p className="text-caption font-semibold uppercase text-secondary">Followers</p>
+            <p className="text-caption font-semibold uppercase text-secondary">{t("social.followers")}</p>
             <p className="mt-2 text-headline-md font-semibold text-primary">{profile.followerCount}</p>
           </div>
           <div className="premium-card p-4">
-            <p className="text-caption font-semibold uppercase text-secondary">Following</p>
+            <p className="text-caption font-semibold uppercase text-secondary">{t("social.following")}</p>
             <p className="mt-2 text-headline-md font-semibold text-primary">{profile.followingCount}</p>
           </div>
         </div>
 
         <div>
           <div className="mb-3 flex items-center justify-between gap-3">
-            <h2 className="text-headline-md font-semibold text-primary">Posts</h2>
-            <Badge tone="muted">{profile.universitySlug || "campus"}</Badge>
+            <h2 className="text-headline-md font-semibold text-primary">{t("social.posts")}</h2>
+            <Badge tone="muted">{profile.universitySlug || t("social.defaultCampus")}</Badge>
           </div>
           <FeedList
             posts={profile.posts}
-            emptyTitle="No posts yet"
-            emptyDescription="Posts from this student will appear here."
+            emptyTitle={t("social.noPostsYet")}
+            emptyDescription={t("social.studentPostsEmpty")}
             showCreateAction={false}
           />
         </div>
@@ -957,14 +1119,15 @@ export function ProfileScreen({
   device: DeviceType;
   posts: SocialPost[];
 }) {
-  const verificationLabel = user?.studentStatus === "verified" ? "Verified student" : user?.studentStatus || "Not verified";
-  const profileName = user?.displayName || user?.name || "Cadesca Student";
-  const universityLabel = user?.universityName || user?.legacyUniversityName || "University not assigned";
+  const { t } = useLanguage();
+  const verificationLabel = user?.studentStatus === "verified" ? t("social.verifiedStudent") : user?.studentStatus || t("social.notVerified");
+  const profileName = user?.displayName || user?.name || t("social.defaultStudentName");
+  const universityLabel = user?.universityName || user?.legacyUniversityName || t("social.universityNotAssigned");
 
   if (!user) {
     return (
       <section>
-        <SocialPageHeader title="Profile" subtitle="Cadesca campus" />
+        <SocialPageHeader title={t("social.profileTitle")} subtitle={t("social.defaultCampus")} />
         <VerificationGate user={user} />
       </section>
     );
@@ -973,15 +1136,15 @@ export function ProfileScreen({
   return (
     <section>
       <SocialPageHeader
-        title="Profile"
-        subtitle={campusCommunityName(user)}
+        title={t("social.profileTitle")}
+        subtitle={campusCommunityName(user, t("social.defaultCampus"))}
         action={
           <Link
             href="/app/user/settings"
             className="inline-flex h-10 items-center justify-center gap-2 rounded-lg border border-outline-variant/30 bg-surface-container-lowest px-4 text-label-md font-semibold text-primary transition-colors hover:bg-surface-container-low"
           >
             <span className="material-symbols-outlined text-[18px]" aria-hidden="true">settings</span>
-            Settings
+            {t("social.settingsTitle")}
           </Link>
         }
       />
@@ -996,37 +1159,37 @@ export function ProfileScreen({
                   {user.studentStatus === "verified" ? <VerifiedBadge /> : <Badge tone="warning">{verificationLabel}</Badge>}
                 </div>
                 <p className="mt-1 break-words text-body-md font-semibold text-secondary">
-                  {user?.username ? `@${user.username}` : "@username pending"}
+                  {user?.username ? `@${user.username}` : t("social.usernamePending")}
                 </p>
                 <p className="mt-2 text-label-md font-semibold text-primary">{universityLabel}</p>
                 {user?.bio ? <p className="mt-3 max-w-2xl whitespace-pre-wrap break-words text-body-md text-primary">{user.bio}</p> : null}
                 <div className="mt-5 grid w-full max-w-md grid-cols-3 gap-2 border-y border-outline-variant/20 py-3 text-center sm:gap-4">
                   <div>
                     <p className="text-title-md font-semibold text-primary">{stats.postsCount}</p>
-                    <p className="mt-0.5 text-caption font-semibold text-secondary">Posts</p>
+                    <p className="mt-0.5 text-caption font-semibold text-secondary">{t("social.posts")}</p>
                   </div>
                   <div>
                     <p className="text-title-md font-semibold text-primary">{stats.followerCount}</p>
-                    <p className="mt-0.5 text-caption font-semibold text-secondary">Followers</p>
+                    <p className="mt-0.5 text-caption font-semibold text-secondary">{t("social.followers")}</p>
                   </div>
                   <div>
                     <p className="text-title-md font-semibold text-primary">{stats.followingCount}</p>
-                    <p className="mt-0.5 text-caption font-semibold text-secondary">Following</p>
+                    <p className="mt-0.5 text-caption font-semibold text-secondary">{t("social.following")}</p>
                   </div>
                 </div>
                 {user?.username ? (
                   <Link href={`/user/${user.username}`} className="mt-4 inline-flex h-9 items-center justify-center rounded-lg border border-outline-variant/30 px-3 text-caption font-semibold text-primary transition-colors hover:bg-surface-container-low">
-                    View public profile
+                    {t("social.viewPublicProfile")}
                   </Link>
                 ) : null}
               </div>
             </div>
           </div>
 
-          <nav className="flex gap-2 overflow-x-auto rounded-full border border-outline-variant/30 bg-surface-container-lowest p-1 shadow-[0_1px_3px_rgba(0,0,0,0.04)]" aria-label="Profile sections">
+          <nav className="flex gap-2 overflow-x-auto rounded-full border border-outline-variant/30 bg-surface-container-lowest p-1 shadow-[0_1px_3px_rgba(0,0,0,0.04)]" aria-label={t("social.profileSections")}>
             {[
-              { href: "#posts", icon: "forum", label: "Posts" },
-              { href: "#student-pass", icon: "qr_code_2", label: "Student Pass" }
+              { href: "#posts", icon: "forum", label: t("social.posts") },
+              { href: "#student-pass", icon: "qr_code_2", label: t("social.studentPass") }
             ].map((item) => (
               <Link
                 key={item.label}
@@ -1041,21 +1204,21 @@ export function ProfileScreen({
 
           <section id="posts" className="scroll-mt-24">
             <div className="mb-3 flex items-center justify-between gap-3">
-              <h2 className="text-headline-md font-semibold text-primary">Posts</h2>
+              <h2 className="text-headline-md font-semibold text-primary">{t("social.posts")}</h2>
               {user?.universitySlug ? <Badge tone="muted">{user.universitySlug}</Badge> : null}
             </div>
             <FeedList
               posts={posts}
-              emptyTitle="No posts yet"
-              emptyDescription="Your campus posts will appear here."
+              emptyTitle={t("social.noPostsYet")}
+              emptyDescription={t("social.ownPostsEmpty")}
               showCreateAction={false}
             />
           </section>
 
           <section id="student-pass" className="scroll-mt-24 space-y-3">
             <div>
-              <h2 className="text-headline-md font-semibold text-primary">Student Pass</h2>
-              <p className="mt-1 text-body-sm text-secondary">Use your verified student pass with Wallet.</p>
+              <h2 className="text-headline-md font-semibold text-primary">{t("social.studentPass")}</h2>
+              <p className="mt-1 text-body-sm text-secondary">{t("social.studentPassDescription")}</p>
             </div>
             <WalletPassSection device={device} showHeader={false} />
           </section>
@@ -1063,20 +1226,20 @@ export function ProfileScreen({
 
         <aside className="space-y-5">
           <div className="rounded-2xl border border-outline-variant/30 bg-surface-container-lowest p-5 shadow-[0_1px_3px_rgba(0,0,0,0.04)]">
-            <h2 className="text-label-lg font-semibold text-primary">Campus verification</h2>
-            <p className="mt-1 text-body-sm text-secondary">Your account is verified for your university community.</p>
+            <h2 className="text-label-lg font-semibold text-primary">{t("social.campusVerification")}</h2>
+            <p className="mt-1 text-body-sm text-secondary">{t("social.campusVerificationDetail")}</p>
             <div className="mt-4 space-y-3 text-label-md">
               <div className="flex items-center justify-between gap-3">
-                <span className="text-secondary">University</span>
+                <span className="text-secondary">{t("social.university")}</span>
                 <span className="text-right font-semibold text-primary">{universityLabel}</span>
               </div>
               <div className="flex items-center justify-between gap-3">
-                <span className="text-secondary">Status</span>
-                <span className="font-semibold text-primary">{user.studentStatus === "verified" ? "Verified" : verificationLabel}</span>
+                <span className="text-secondary">{t("social.status")}</span>
+                <span className="font-semibold text-primary">{user.studentStatus === "verified" ? t("social.verified") : verificationLabel}</span>
               </div>
             </div>
           </div>
-          <LogoutCard />
+          <LogoutCard className="md:hidden" />
         </aside>
       </div>
     </section>
