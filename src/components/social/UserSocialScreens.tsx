@@ -62,6 +62,22 @@ function formatDateTime(value: string | null | undefined, language: Language = "
   }).format(new Date(value));
 }
 
+function formatCompactTime(value: string | null | undefined, language: Language = "en") {
+  if (!value) return "";
+  const date = new Date(value);
+  const diffMs = Math.max(0, Date.now() - date.getTime());
+  const minutes = Math.floor(diffMs / 60000);
+  const hours = Math.floor(minutes / 60);
+  const days = Math.floor(hours / 24);
+
+  if (minutes < 1) return "1m";
+  if (minutes < 60) return `${minutes}m`;
+  if (hours < 24) return `${hours}h`;
+  if (days < 7) return `${days}d`;
+
+  return new Intl.DateTimeFormat(DATE_LOCALES[language], { month: "short", day: "numeric" }).format(date);
+}
+
 function campusCommunityName(user: CurrentStudentContext | null | undefined, fallback = "Cadesca campus") {
   const university = user?.universityName || user?.legacyUniversityName;
   if (!university) return fallback;
@@ -87,10 +103,10 @@ function SocialPageHeader({
   action?: React.ReactNode;
 }) {
   return (
-    <div className="mx-auto mb-5 flex w-full max-w-5xl flex-col items-start gap-3 sm:flex-row sm:items-end sm:justify-between">
+    <div className="mx-auto mb-4 flex w-full max-w-4xl items-center justify-between gap-2 border-b border-outline-variant/20 pb-3">
       <div className="w-full min-w-0 max-w-full sm:flex-1">
-        <h1 className="text-headline-md font-semibold text-primary">{title}</h1>
-        {subtitle ? <p className="mt-1 break-words text-body-md text-secondary">{subtitle}</p> : null}
+        <h1 className="text-title-lg font-semibold tracking-[-0.01em] text-primary sm:text-headline-md">{title}</h1>
+        {subtitle ? <p className="mt-0.5 break-words text-caption font-semibold text-secondary sm:text-body-sm">{subtitle}</p> : null}
       </div>
       {action ? <div className="max-w-full sm:shrink-0">{action}</div> : null}
     </div>
@@ -124,7 +140,7 @@ function Avatar({
         inverse ? "bg-primary text-on-primary" : "bg-surface-container-low text-primary"
       )}
     >
-      {src ? <img src={src} alt="" className="h-full w-full object-cover" /> : initials(name, t("social.defaultStudentName"))}
+      {src ? <img src={src} alt={name || t("social.defaultStudentName")} className="h-full w-full object-cover" /> : initials(name, t("social.defaultStudentName"))}
     </div>
   );
 }
@@ -202,7 +218,7 @@ function ImageUploadPicker({
         <div className={cn("flex min-w-0 flex-1 items-center gap-3", compact && "gap-2")}>
           <div className={cn("flex shrink-0 items-center justify-center overflow-hidden rounded-xl border border-outline-variant/20 bg-surface-container-low", compact ? "h-12 w-12" : "h-16 w-16")}>
             {previewUrl ? (
-              <img src={previewUrl} alt="" className="h-full w-full object-cover" />
+              <img src={previewUrl} alt={selectedName || t("social.photoSelected")} className="h-full w-full object-cover" />
             ) : (
               <span className="material-symbols-outlined text-[22px] text-secondary" aria-hidden="true">add_photo_alternate</span>
             )}
@@ -242,7 +258,7 @@ function VerifiedBadge() {
     <span className="relative inline-flex">
       <button
         type="button"
-        className="inline-flex h-5 w-5 items-center justify-center rounded-full text-primary transition-colors hover:bg-surface-container-low focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30"
+        className="-my-3 inline-flex h-11 w-11 items-center justify-center rounded-full text-primary transition-colors hover:bg-surface-container-low focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30"
         aria-label={t("social.verifiedBadgeLabel")}
         aria-describedby={open ? tooltipId : undefined}
         aria-expanded={open}
@@ -264,7 +280,7 @@ function VerifiedBadge() {
         <span
           id={tooltipId}
           role="tooltip"
-          className="absolute left-0 top-7 z-20 w-64 rounded-xl border border-outline-variant/30 bg-surface-container-lowest p-3 text-caption font-semibold text-secondary shadow-soft"
+          className="absolute left-0 top-9 z-20 w-64 rounded-xl border border-outline-variant/30 bg-surface-container-lowest p-3 text-caption font-semibold text-secondary shadow-soft"
         >
           {t("social.verifiedBadgeTooltip")}
         </span>
@@ -330,6 +346,27 @@ export function SocialUnavailableScreen({ message: _message }: { message?: strin
   );
 }
 
+function CompactComposer({ user }: { user: CurrentStudentContext }) {
+  const { t } = useLanguage();
+  const authorName = user.displayName || user.name;
+
+  return (
+    <Link
+      href="/app/user/create"
+      className="group flex min-h-16 items-center gap-3 border-b border-outline-variant/30 px-1 py-3 transition-colors hover:bg-surface-container-low/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30"
+      aria-label={t("social.createPost")}
+    >
+      <Avatar name={authorName} src={user.avatarUrl} inverse />
+      <span className="min-w-0 flex-1 truncate text-body-sm text-secondary group-hover:text-primary">
+        {t("social.postCompactPlaceholder")}
+      </span>
+      <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-secondary transition-colors group-hover:bg-surface-container-low group-hover:text-primary">
+        <span className="material-symbols-outlined text-[20px]" aria-hidden="true">image</span>
+      </span>
+    </Link>
+  );
+}
+
 function PostComposer({
   compact = false,
   redirectAfterPost = false,
@@ -348,7 +385,7 @@ function PostComposer({
   const statusMessage = state.message ? translatedMessage(t, state.message) : `${t("social.visibleToVerified")} ${community}.`;
 
   return (
-    <form action={formAction} className="rounded-2xl border border-outline-variant/30 bg-surface-container-lowest p-4 shadow-[0_1px_3px_rgba(0,0,0,0.04)]">
+    <form action={formAction} className="rounded-xl border border-outline-variant/30 bg-surface-container-lowest p-3 sm:p-4">
       {redirectAfterPost ? <input type="hidden" name="redirectToHome" value="true" /> : null}
       <div className="flex gap-3">
         <div className="mt-1">
@@ -363,18 +400,18 @@ function PostComposer({
           ) : null}
           <textarea
             name="body"
-            rows={compact ? 3 : 5}
+            rows={compact ? 2 : 6}
             maxLength={POST_MAX_LENGTH}
             value={body}
             onChange={(event) => setBody(event.target.value)}
             placeholder={placeholder}
             className={cn(
-              "w-full resize-none rounded-2xl border border-transparent bg-surface-container-low px-4 py-3 text-body-md text-primary outline-none transition placeholder:text-secondary focus:border-primary",
-              compact ? "min-h-20" : "min-h-36"
+              "w-full resize-none rounded-xl border border-transparent bg-surface-container-low px-3.5 py-3 text-body-md text-primary outline-none transition placeholder:text-secondary focus:border-primary",
+              compact ? "min-h-16" : "min-h-40"
             )}
           />
           <div className="mt-3">
-            <ImageUploadPicker name="imageFile" compact helpText={t("social.postPhotoHelp")} />
+            <ImageUploadPicker name="imageFile" compact={compact} helpText={t("social.postPhotoHelp")} />
           </div>
           <div className="mt-3 flex flex-col gap-3 sm:flex-row sm:items-center">
             <label className="flex min-w-0 flex-1 items-center gap-2 rounded-full border border-outline-variant/30 bg-surface-container-lowest px-3 py-2">
@@ -424,8 +461,8 @@ function ActionIconButton({
       aria-label={title}
       disabled={pending}
       className={cn(
-        "inline-flex h-9 items-center justify-center gap-1.5 rounded-full border border-transparent px-3 text-caption font-semibold transition-colors disabled:cursor-wait disabled:opacity-60",
-        !children && "w-9 px-0",
+        "inline-flex h-11 items-center justify-center gap-1.5 rounded-full border border-transparent px-3 text-caption font-semibold transition-colors disabled:cursor-wait disabled:opacity-60",
+        !children && "w-11 px-0",
         active ? "bg-primary text-on-primary" : "text-secondary hover:bg-surface-container-low hover:text-primary"
       )}
     >
@@ -446,7 +483,7 @@ function CommentForm({ postId }: { postId: string }) {
         name="body"
         maxLength={500}
         placeholder={t("social.writeComment")}
-        className="h-10 min-w-0 flex-1 rounded-lg border border-outline-variant/30 bg-surface-container-lowest px-3 text-label-md text-primary outline-none transition focus:border-primary"
+        className="h-11 min-w-0 flex-1 rounded-lg border border-outline-variant/30 bg-surface-container-lowest px-3 text-label-md text-primary outline-none transition focus:border-primary"
       />
       <Button type="submit" size="sm" variant="secondary" icon="chat_bubble" disabled={isPending}>
         {isPending ? t("social.sending") : t("social.reply")}
@@ -456,58 +493,86 @@ function CommentForm({ postId }: { postId: string }) {
   );
 }
 
-function SocialPostCard({ post }: { post: SocialPost }) {
-  const { language, t } = useLanguage();
-  const [commentsOpen, setCommentsOpen] = useState(post.comments.length > 0);
+function PostOverflowMenu({ post }: { post: SocialPost }) {
+  const { t } = useLanguage();
+  const [open, setOpen] = useState(false);
 
   return (
-    <article className="overflow-hidden rounded-2xl border border-outline-variant/30 bg-surface-container-lowest shadow-[0_1px_3px_rgba(0,0,0,0.04)]">
-      <div className="px-4 py-3">
+    <div className="relative shrink-0">
+      <button
+        type="button"
+        className="flex h-11 w-11 items-center justify-center rounded-full text-secondary transition-colors hover:bg-surface-container-low hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30"
+        aria-label={t("common.actions")}
+        aria-expanded={open}
+        onClick={() => setOpen((value) => !value)}
+      >
+        <span className="material-symbols-outlined text-[20px]" aria-hidden="true">more_horiz</span>
+      </button>
+      {open ? (
+        <div className="absolute right-0 top-12 z-20 min-w-36 overflow-hidden rounded-xl border border-outline-variant/40 bg-surface-container-lowest p-1 shadow-md">
+          {post.ownPost ? (
+            <form action={deletePostAction} onSubmit={() => setOpen(false)}>
+              <input type="hidden" name="postId" value={post.id} />
+              <button type="submit" className="flex min-h-11 w-full items-center gap-2 rounded-lg px-3 text-left text-label-md font-semibold text-primary transition-colors hover:bg-surface-container-low">
+                <span className="material-symbols-outlined text-[18px]" aria-hidden="true">delete</span>
+                {t("social.deletePost")}
+              </button>
+            </form>
+          ) : (
+            <form action={reportPostAction} onSubmit={() => setOpen(false)}>
+              <input type="hidden" name="postId" value={post.id} />
+              <input type="hidden" name="reason" value={t("social.reportedFromFeed")} />
+              <button type="submit" className="flex min-h-11 w-full items-center gap-2 rounded-lg px-3 text-left text-label-md font-semibold text-primary transition-colors hover:bg-surface-container-low">
+                <span className="material-symbols-outlined text-[18px]" aria-hidden="true">flag</span>
+                {t("social.report")}
+              </button>
+            </form>
+          )}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+function SocialPostCard({ post }: { post: SocialPost }) {
+  const { language, t } = useLanguage();
+  const [commentsOpen, setCommentsOpen] = useState(false);
+
+  return (
+    <article className="overflow-hidden border-b border-outline-variant/30 bg-surface-container-lowest px-1 py-4 first:border-t sm:px-2">
+      <div>
         <div className="flex items-start justify-between gap-3">
           <div className="flex min-w-0 gap-3">
-            <Avatar name={post.authorName} src={post.authorAvatarUrl} />
+            <Avatar name={post.authorName} src={post.authorAvatarUrl} size="sm" />
             <div className="min-w-0">
               <div className="flex flex-wrap items-center gap-2">
                 {post.authorUsername ? (
-                  <Link href={`/user/${post.authorUsername}`} className="truncate text-label-md font-semibold text-primary hover:underline">
+                  <Link href={`/user/${post.authorUsername}`} className="max-w-full break-words text-label-md font-semibold text-primary hover:underline">
                     {post.authorName}
                   </Link>
                 ) : (
-                  <h2 className="truncate text-label-md font-semibold text-primary">{post.authorName}</h2>
+                  <h2 className="max-w-full break-words text-label-md font-semibold text-primary">{post.authorName}</h2>
                 )}
                 <VerifiedBadge />
               </div>
               <p className="mt-0.5 text-caption font-medium text-secondary">
                 {post.authorUsername ? `@${post.authorUsername} · ` : ""}
-                {post.universityName} · {formatDateTime(post.createdAt, language)}
+                {post.universityName} · {formatCompactTime(post.createdAt, language)}
               </p>
             </div>
           </div>
-          {post.ownPost ? (
-            <form action={deletePostAction}>
-              <input type="hidden" name="postId" value={post.id} />
-              <ActionIconButton icon="delete" title={t("social.deletePost")} />
-            </form>
-          ) : (
-            <form action={reportPostAction}>
-              <input type="hidden" name="postId" value={post.id} />
-              <input type="hidden" name="reason" value={t("social.reportedFromFeed")} />
-              <ActionIconButton icon="flag" title={t("social.reportPost")}>
-                {t("social.report")}
-              </ActionIconButton>
-            </form>
-          )}
+          <PostOverflowMenu post={post} />
         </div>
 
-        <p className="mt-2.5 whitespace-pre-wrap break-words text-body-md text-primary">{post.body}</p>
+        <p className="mt-3 whitespace-pre-wrap break-words text-body-md leading-6 text-primary">{post.body}</p>
 
         {post.imageUrl ? (
-          <div className="mt-3 overflow-hidden rounded-2xl border border-outline-variant/20 bg-surface-container-low">
-            <img src={post.imageUrl} alt="" className="max-h-[520px] w-full object-cover" />
+          <div className="mt-3 overflow-hidden rounded-xl border border-outline-variant/20 bg-surface-container-low">
+            <img src={post.imageUrl} alt={post.body.slice(0, 120)} className="max-h-[520px] w-full object-contain" />
           </div>
         ) : null}
 
-        <div className="mt-3 flex flex-wrap items-center gap-1 border-t border-outline-variant/20 pt-2">
+        <div className="mt-2 flex items-center gap-1 border-t border-outline-variant/20 pt-2">
           <form action={togglePostLikeAction}>
             <input type="hidden" name="postId" value={post.id} />
             <ActionIconButton icon="favorite" active={post.likedByCurrentUser} title={t("social.likePost")}>
@@ -517,26 +582,28 @@ function SocialPostCard({ post }: { post: SocialPost }) {
           <button
             type="button"
             onClick={() => setCommentsOpen((open) => !open)}
-            className="inline-flex h-9 items-center gap-1.5 rounded-full border border-transparent px-3 text-caption font-semibold text-secondary transition-colors hover:bg-surface-container-low hover:text-primary"
+            className="inline-flex h-11 items-center gap-1.5 rounded-full border border-transparent px-3 text-caption font-semibold text-secondary transition-colors hover:bg-surface-container-low hover:text-primary"
+            aria-expanded={commentsOpen}
           >
             <span className="material-symbols-outlined text-[18px]" aria-hidden="true">mode_comment</span>
             <span>{post.commentCount}</span>
           </button>
           <button
             type="button"
-            className="inline-flex h-9 items-center gap-1.5 rounded-full border border-transparent px-3 text-caption font-semibold text-secondary transition-colors hover:bg-surface-container-low hover:text-primary"
+            className="inline-flex h-11 items-center gap-1.5 rounded-full border border-transparent px-3 text-caption font-semibold text-secondary transition-colors hover:bg-surface-container-low hover:text-primary"
             title={t("social.share")}
+            aria-label={t("social.share")}
           >
             <span className="material-symbols-outlined text-[18px]" aria-hidden="true">ios_share</span>
-            <span>{t("social.share")}</span>
+            <span className="hidden sm:inline">{t("social.share")}</span>
           </button>
         </div>
 
         {commentsOpen ? (
           <div className="mt-3 border-t border-outline-variant/20 pt-3">
             <div className="space-y-3">
-              {post.comments.map((comment) => (
-                <div key={comment.id} className="rounded-2xl bg-surface-container-low px-3 py-2">
+              {post.comments.slice(0, 2).map((comment) => (
+                <div key={comment.id} className="rounded-lg bg-surface-container-low px-3 py-2">
                   <div className="flex gap-2">
                     <Avatar name={comment.authorName} src={comment.authorAvatarUrl} size="sm" />
                     <div className="min-w-0 flex-1">
@@ -559,6 +626,9 @@ function SocialPostCard({ post }: { post: SocialPost }) {
                 </div>
               ))}
             </div>
+            {post.commentCount > post.comments.length || post.comments.length > 2 ? (
+              <p className="mt-3 text-caption font-semibold text-secondary">{t("social.viewAllComments")}</p>
+            ) : null}
             <CommentForm postId={post.id} />
           </div>
         ) : null}
@@ -584,10 +654,10 @@ function FeedList({
 
   if (!posts.length) {
     return (
-      <div className="rounded-2xl border border-outline-variant/30 bg-surface-container-lowest p-6 text-center shadow-[0_1px_3px_rgba(0,0,0,0.04)]">
+      <div className="border-y border-outline-variant/30 bg-surface-container-lowest px-5 py-10 text-center">
         <span className="material-symbols-outlined text-[28px] text-primary" aria-hidden="true">forum</span>
-        <h2 className="mt-3 text-headline-md font-semibold text-primary">{title}</h2>
-        <p className="mt-2 text-body-md text-secondary">{description}</p>
+        <h2 className="mt-3 text-title-lg font-semibold text-primary">{title}</h2>
+        <p className="mx-auto mt-1.5 max-w-sm text-body-sm text-secondary">{description}</p>
         {showCreateAction ? (
           <Link
             href="/app/user/create"
@@ -602,11 +672,49 @@ function FeedList({
   }
 
   return (
-    <div className="space-y-3">
+    <div className="overflow-hidden bg-surface-container-lowest">
       {posts.map((post) => (
         <SocialPostCard key={post.id} post={post} />
       ))}
     </div>
+  );
+}
+
+function SocialRightRail({ user, postCount }: { user: CurrentStudentContext; postCount?: number }) {
+  const { t } = useLanguage();
+  const community = campusCommunityName(user, t("social.defaultCampus"));
+
+  return (
+    <aside className="hidden space-y-4 xl:block">
+      <div className="rounded-xl border border-outline-variant/30 bg-surface-container-lowest p-4">
+        <div className="flex items-center justify-between gap-3">
+          <h2 className="text-label-lg font-semibold text-primary">{t("social.campusSnapshot")}</h2>
+          <span className="material-symbols-outlined text-[18px] text-secondary" aria-hidden="true">public</span>
+        </div>
+        <p className="mt-1 text-body-sm text-secondary">{community}</p>
+        {typeof postCount === "number" ? (
+          <p className="mt-4 text-caption font-semibold text-secondary">{postCount} {t("social.postsCount")}</p>
+        ) : null}
+      </div>
+      <div className="rounded-xl border border-outline-variant/30 bg-surface-container-lowest p-4">
+        <div className="flex items-center justify-between gap-3">
+          <h2 className="text-label-lg font-semibold text-primary">{t("social.campusFeatures")}</h2>
+          <span className="material-symbols-outlined text-[18px] text-secondary" aria-hidden="true">auto_awesome</span>
+        </div>
+        <div className="mt-3 space-y-3">
+          {[
+            ["home_work", t("social.featureRoommateTitle")],
+            ["event_available", t("social.featureEventsTitle")],
+            ["local_mall", t("social.featureMarketplaceTitle")]
+          ].map(([icon, label]) => (
+            <div key={label} className="flex items-center gap-2.5 text-body-sm font-semibold text-primary">
+              <span className="material-symbols-outlined text-[18px] text-secondary" aria-hidden="true">{icon}</span>
+              <span className="min-w-0 truncate">{label}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+    </aside>
   );
 }
 
@@ -621,14 +729,17 @@ export function HomeFeedScreen({ user, posts }: { user: CurrentStudentContext | 
         subtitle={universityLabel}
       />
       {isVerifiedStudent(user) ? (
-        <div className="mx-auto grid max-w-xl gap-3">
-          <PostComposer compact user={user} />
-          <FeedList
-            posts={posts}
-            emptyTitle={t("social.emptyFirstPostTitle")}
-            emptyDescription={t("social.emptyHomeDescription")}
-            showCreateAction
-          />
+        <div className="mx-auto grid w-full max-w-4xl gap-8 xl:grid-cols-[minmax(0,680px)_260px]">
+          <div className="min-w-0">
+            <CompactComposer user={user} />
+            <FeedList
+              posts={posts}
+              emptyTitle={t("social.emptyFirstPostTitle")}
+              emptyDescription={t("social.emptyHomeDescription")}
+              showCreateAction
+            />
+          </div>
+          <SocialRightRail user={user} postCount={posts.length} />
         </div>
       ) : (
         <VerificationGate user={user} />
@@ -685,28 +796,28 @@ function ExploreFeatureCard({
   const description = t(descriptionKey);
 
   return (
-    <article className="group relative h-36 overflow-hidden rounded-[1.65rem] bg-primary text-on-primary shadow-[0_8px_24px_rgba(0,0,0,0.16)] sm:h-[220px]">
+    <article className="group relative h-36 min-w-0 overflow-hidden rounded-xl bg-primary text-on-primary sm:h-40">
       <img
         src={imageUrl}
         alt=""
         className="absolute inset-0 h-full w-full object-cover transition duration-500 group-hover:scale-[1.03]"
         loading="lazy"
       />
-      <div className="absolute inset-0 bg-[linear-gradient(90deg,rgba(0,0,0,0.78)_0%,rgba(0,0,0,0.48)_38%,rgba(0,0,0,0.08)_100%)]" />
+      <div className="absolute inset-0 bg-[linear-gradient(90deg,rgba(0,0,0,0.82)_0%,rgba(0,0,0,0.42)_56%,rgba(0,0,0,0.08)_100%)]" />
       <div className="absolute inset-x-0 bottom-0 h-2/3 bg-gradient-to-t from-black/70 via-black/30 to-transparent" />
 
-      <div className="relative flex h-full flex-col justify-between p-5 sm:p-6">
-        <span className="flex h-14 w-14 items-center justify-center rounded-full bg-white text-primary shadow-[0_8px_20px_rgba(0,0,0,0.16)] sm:h-[76px] sm:w-[76px]">
-          <span className="material-symbols-outlined text-[29px] sm:text-[38px]" aria-hidden="true">{icon}</span>
+      <div className="relative flex h-full flex-col justify-between p-4">
+        <span className="flex h-9 w-9 items-center justify-center rounded-full bg-white text-primary">
+          <span className="material-symbols-outlined text-[20px]" aria-hidden="true">{icon}</span>
         </span>
 
-        <div className="min-w-0 pr-20 sm:pr-28">
-          <h2 className="whitespace-nowrap text-[24px] font-bold leading-[1.05] tracking-normal text-white sm:text-[32px] sm:leading-[1.08]">{title}</h2>
-          <p className="mt-1.5 max-w-[16rem] text-[16px] font-semibold leading-[1.18] text-white sm:mt-2 sm:text-[18px] sm:leading-[1.25]">
+        <div className="min-w-0 pr-16">
+          <h2 className="truncate text-title-lg font-semibold leading-tight text-white">{title}</h2>
+          <p className="mt-1 line-clamp-2 max-w-[16rem] text-caption font-semibold leading-4 text-white/90">
             {description}
           </p>
         </div>
-        <span className="absolute bottom-5 right-5 inline-flex h-10 items-center justify-center rounded-2xl border border-white/60 bg-white/90 px-5 text-label-md font-bold text-primary shadow-[inset_0_0_0_1px_rgba(0,0,0,0.12),0_8px_18px_rgba(0,0,0,0.20)] backdrop-blur sm:h-11 sm:px-6 sm:text-label-lg">
+        <span className="absolute bottom-4 right-4 inline-flex h-8 items-center justify-center rounded-lg border border-white/60 bg-white/90 px-3 text-caption font-semibold text-primary backdrop-blur">
           {t("social.soon")}
         </span>
       </div>
@@ -721,23 +832,26 @@ export function ExploreScreen({ user, posts }: { user: CurrentStudentContext | n
     <section>
       <SocialPageHeader title={t("social.exploreTitle")} subtitle={`${campusCommunityName(user, t("social.defaultCampus"))} ${t("social.launchpad")}`} />
       {isVerifiedStudent(user) ? (
-        <div className="mx-auto max-w-3xl space-y-6">
-          <div className="grid gap-3 sm:gap-4">
-            {exploreFeatureCards.map((card) => (
-              <ExploreFeatureCard key={card.titleKey} {...card} />
-            ))}
-          </div>
-          <div>
-            <div className="mb-3 flex items-center justify-between gap-3">
-              <h2 className="text-headline-md font-semibold text-primary">{t("social.campusPosts")}</h2>
-              <Badge tone="muted">{posts.length} {t("social.postsCount")}</Badge>
+        <div className="mx-auto grid w-full max-w-4xl gap-8 xl:grid-cols-[minmax(0,680px)_260px]">
+          <div className="min-w-0 space-y-5">
+            <div className="grid auto-cols-[minmax(220px,1fr)] grid-flow-col gap-3 overflow-x-auto pb-1 sm:auto-cols-[minmax(250px,1fr)]">
+              {exploreFeatureCards.map((card) => (
+                <ExploreFeatureCard key={card.titleKey} {...card} />
+              ))}
             </div>
-            <FeedList
-              posts={posts}
-              emptyTitle={t("social.noTrendsTitle")}
-              emptyDescription={t("social.noTrendsDescription")}
-            />
+            <div>
+              <div className="mb-2 flex items-center justify-between gap-3">
+                <h2 className="text-title-lg font-semibold text-primary">{t("social.campusPosts")}</h2>
+                <Badge tone="muted">{posts.length} {t("social.postsCount")}</Badge>
+              </div>
+              <FeedList
+                posts={posts}
+                emptyTitle={t("social.noTrendsTitle")}
+                emptyDescription={t("social.noTrendsDescription")}
+              />
+            </div>
           </div>
+          <SocialRightRail user={user} postCount={posts.length} />
         </div>
       ) : (
         <VerificationGate user={user} />
@@ -751,7 +865,19 @@ export function CreatePostScreen({ user }: { user: CurrentStudentContext | null 
 
   return (
     <section>
-      <SocialPageHeader title={t("social.createPostTitle")} subtitle={`${t("social.shareWith")} ${campusCommunityName(user, t("social.defaultCampus"))}`} />
+      <SocialPageHeader
+        title={t("social.createPostTitle")}
+        subtitle={`${t("social.shareWith")} ${campusCommunityName(user, t("social.defaultCampus"))}`}
+        action={
+          <Link
+            href="/app/user/home"
+            className="inline-flex h-11 w-11 items-center justify-center rounded-full text-secondary transition-colors hover:bg-surface-container-low hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30"
+            aria-label={t("common.close")}
+          >
+            <span className="material-symbols-outlined text-[20px]" aria-hidden="true">close</span>
+          </Link>
+        }
+      />
       {isVerifiedStudent(user) ? (
         <div className="mx-auto max-w-2xl">
           <PostComposer user={user} redirectAfterPost />
@@ -763,6 +889,13 @@ export function CreatePostScreen({ user }: { user: CurrentStudentContext | null 
   );
 }
 
+function activityGroup(createdAt: string) {
+  const days = Math.floor(Math.max(0, Date.now() - new Date(createdAt).getTime()) / 86400000);
+  if (days < 1) return "today" as const;
+  if (days < 7) return "week" as const;
+  return "earlier" as const;
+}
+
 export function ActivityScreen({
   user,
   items
@@ -771,41 +904,77 @@ export function ActivityScreen({
   items: SocialActivityItem[];
 }) {
   const { language, t } = useLanguage();
+  const [readItems, setReadItems] = useState<Set<string>>(() => new Set());
+  const unreadCount = Math.max(0, items.length - readItems.size);
+  const groupedItems = items.reduce<Record<"today" | "week" | "earlier", SocialActivityItem[]>>((groups, item) => {
+    groups[activityGroup(item.createdAt)].push(item);
+    return groups;
+  }, { today: [], week: [], earlier: [] });
+
+  function markAsRead(id: string) {
+    setReadItems((current) => new Set(current).add(id));
+  }
 
   return (
     <section>
-      <SocialPageHeader title={t("social.activityTitle")} subtitle={t("social.activitySubtitle")} />
+      <SocialPageHeader
+        title={t("social.activityTitle")}
+        subtitle={t("social.activitySubtitle")}
+        action={unreadCount ? (
+          <button
+            type="button"
+            className="inline-flex h-11 w-11 items-center justify-center gap-2 rounded-full text-caption font-semibold text-secondary transition-colors hover:bg-surface-container-low hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 sm:w-auto sm:rounded-lg sm:px-3"
+            onClick={() => setReadItems(new Set(items.map((item) => item.id)))}
+            aria-label={t("social.markAllRead")}
+          >
+            <span className="material-symbols-outlined text-[19px]" aria-hidden="true">done_all</span>
+            <span className="hidden sm:inline">{t("social.markAllRead")}</span>
+          </button>
+        ) : null}
+      />
       {isVerifiedStudent(user) ? (
-        <div className="mx-auto max-w-3xl space-y-3">
-          {items.length ? items.map((item) => (
-            <div key={item.id} className="rounded-2xl border border-outline-variant/30 bg-surface-container-lowest px-4 py-3 shadow-[0_1px_3px_rgba(0,0,0,0.04)]">
-              <div className="flex gap-3">
-                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-outline-variant/30 bg-surface-container-low">
-                  <span className="material-symbols-outlined text-[20px] text-primary" aria-hidden="true">
-                    {item.type === "like" ? "favorite" : item.type === "follow" ? "person_add" : "mode_comment"}
-                  </span>
-                </div>
-                <div className="min-w-0">
-                  <p className="text-label-md font-semibold text-primary">
-                    {item.actorName} {item.type === "like" ? t("social.likedYourPost") : item.type === "follow" ? t("social.followedYou") : t("social.commentedOnPost")}
-                  </p>
-                  {item.actorUsername && item.type === "follow" ? (
-                    <p className="mt-1 text-body-sm font-semibold text-secondary">@{item.actorUsername}</p>
-                  ) : null}
-                  {item.type !== "follow" ? (
-                    <p className="mt-1 break-words text-body-sm text-secondary">
-                      {item.commentBody || item.postPreview}
-                    </p>
-                  ) : null}
-                  <p className="mt-2 text-caption text-secondary">{formatDateTime(item.createdAt, language)}</p>
-                </div>
-              </div>
-            </div>
-          )) : (
-            <div className="rounded-2xl border border-outline-variant/30 bg-surface-container-lowest p-6 text-center shadow-[0_1px_3px_rgba(0,0,0,0.04)]">
+        <div className="mx-auto max-w-3xl overflow-hidden border-y border-outline-variant/30 bg-surface-container-lowest">
+          {items.length ? (Object.entries(groupedItems) as Array<["today" | "week" | "earlier", SocialActivityItem[]]>).map(([group, groupItems]) => groupItems.length ? (
+            <section key={group} aria-labelledby={`activity-${group}`}>
+              <h2 id={`activity-${group}`} className="border-b border-outline-variant/20 bg-surface-container-low px-3 py-2 text-caption font-semibold uppercase tracking-[0.08em] text-secondary sm:px-4">
+                {group === "today" ? t("common.today") : group === "week" ? t("social.activityThisWeek") : t("social.activityEarlier")}
+              </h2>
+              {groupItems.map((item) => {
+                const unread = !readItems.has(item.id);
+                return (
+                  <button
+                    key={item.id}
+                    type="button"
+                    className={cn("flex min-h-[72px] w-full items-center gap-3 border-b border-outline-variant/20 px-3 py-3 text-left transition-colors last:border-b-0 hover:bg-surface-container-low/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary/30 sm:px-4", unread && "bg-surface-container-low/50")}
+                    onClick={() => markAsRead(item.id)}
+                  >
+                    <div className="relative flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-full border border-outline-variant/30 bg-surface-container-low">
+                      <Avatar name={item.actorName} size="sm" />
+                      <span className="absolute bottom-0 right-0 flex h-4 w-4 items-center justify-center rounded-full border border-surface-container-lowest bg-primary text-on-primary">
+                        <span className="material-symbols-outlined text-[10px]" aria-hidden="true">
+                          {item.type === "like" ? "favorite" : item.type === "follow" ? "person_add" : "mode_comment"}
+                        </span>
+                      </span>
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-label-md font-semibold text-primary">
+                        {item.actorName} {item.type === "like" ? t("social.likedYourPost") : item.type === "follow" ? t("social.followedYou") : t("social.commentedOnPost")}
+                      </p>
+                      {item.type !== "follow" ? (
+                        <p className="mt-0.5 truncate text-body-sm text-secondary">{item.commentBody || item.postPreview}</p>
+                      ) : null}
+                    </div>
+                    <span className="shrink-0 text-caption text-secondary">{formatCompactTime(item.createdAt, language)}</span>
+                    {unread ? <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-primary" aria-label={t("social.unreadActivity")} /> : null}
+                  </button>
+                );
+              })}
+            </section>
+          ) : null) : (
+            <div className="px-6 py-12 text-center">
               <span className="material-symbols-outlined text-[28px] text-primary" aria-hidden="true">notifications</span>
-              <h2 className="mt-3 text-headline-md font-semibold text-primary">{t("social.noActivityTitle")}</h2>
-              <p className="mt-2 text-body-md text-secondary">{t("social.noActivityDescription")}</p>
+              <h2 className="mt-3 text-title-lg font-semibold text-primary">{t("social.noActivityTitle")}</h2>
+              <p className="mx-auto mt-1.5 max-w-sm text-body-sm text-secondary">{t("social.noActivityDescription")}</p>
             </div>
           )}
         </div>
@@ -1137,75 +1306,80 @@ export function ProfileScreen({
     <section>
       <SocialPageHeader
         title={t("social.profileTitle")}
-        subtitle={campusCommunityName(user, t("social.defaultCampus"))}
         action={
           <Link
             href="/app/user/settings"
-            className="inline-flex h-10 items-center justify-center gap-2 rounded-lg border border-outline-variant/30 bg-surface-container-lowest px-4 text-label-md font-semibold text-primary transition-colors hover:bg-surface-container-low"
+            className="inline-flex h-11 w-11 items-center justify-center rounded-full text-secondary transition-colors hover:bg-surface-container-low hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30"
+            aria-label={t("social.settingsTitle")}
           >
-            <span className="material-symbols-outlined text-[18px]" aria-hidden="true">settings</span>
-            {t("social.settingsTitle")}
+            <span className="material-symbols-outlined text-[20px]" aria-hidden="true">settings</span>
           </Link>
         }
       />
-      <div className="mx-auto grid w-full max-w-5xl gap-5 xl:grid-cols-[minmax(0,1fr)_340px]">
-        <div className="space-y-5">
-          <div className="rounded-2xl border border-outline-variant/30 bg-surface-container-lowest p-5 shadow-[0_1px_3px_rgba(0,0,0,0.04)]">
-            <div className="flex flex-col items-start gap-4 sm:flex-row">
-              <Avatar name={profileName} src={user?.avatarUrl} size="xl" inverse />
-              <div className="w-full min-w-0 flex-1">
-                <div className="flex flex-wrap items-center gap-2">
-                  <h2 className="break-words text-title-lg font-semibold text-primary sm:text-headline-md">{profileName}</h2>
-                  {user.studentStatus === "verified" ? <VerifiedBadge /> : <Badge tone="warning">{verificationLabel}</Badge>}
-                </div>
-                <p className="mt-1 break-words text-body-md font-semibold text-secondary">
-                  {user?.username ? `@${user.username}` : t("social.usernamePending")}
-                </p>
-                <p className="mt-2 text-label-md font-semibold text-primary">{universityLabel}</p>
-                {user?.bio ? <p className="mt-3 max-w-2xl whitespace-pre-wrap break-words text-body-md text-primary">{user.bio}</p> : null}
-                <div className="mt-5 grid w-full max-w-md grid-cols-3 gap-2 border-y border-outline-variant/20 py-3 text-center sm:gap-4">
-                  <div>
+      <div className="mx-auto grid w-full max-w-4xl gap-8 xl:grid-cols-[minmax(0,680px)_260px]">
+        <div className="min-w-0">
+          <div className="border-b border-outline-variant/30 pb-5">
+            <div className="flex items-start gap-4 sm:gap-6">
+              <Avatar name={profileName} src={user.avatarUrl} size="lg" inverse />
+              <div className="min-w-0 flex-1">
+                <div className="grid grid-cols-3 gap-2 text-center sm:max-w-sm sm:gap-5">
+                  <Link href={user.username ? `/user/${user.username}#posts` : "#posts"} className="rounded-lg py-1 transition-colors hover:bg-surface-container-low focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30">
                     <p className="text-title-md font-semibold text-primary">{stats.postsCount}</p>
-                    <p className="mt-0.5 text-caption font-semibold text-secondary">{t("social.posts")}</p>
-                  </div>
-                  <div>
+                    <p className="mt-0.5 text-caption text-secondary">{t("social.posts")}</p>
+                  </Link>
+                  <Link href={user.username ? `/user/${user.username}#followers` : "#followers"} className="rounded-lg py-1 transition-colors hover:bg-surface-container-low focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30">
                     <p className="text-title-md font-semibold text-primary">{stats.followerCount}</p>
-                    <p className="mt-0.5 text-caption font-semibold text-secondary">{t("social.followers")}</p>
-                  </div>
-                  <div>
+                    <p className="mt-0.5 text-caption text-secondary">{t("social.followers")}</p>
+                  </Link>
+                  <Link href={user.username ? `/user/${user.username}#following` : "#following"} className="rounded-lg py-1 transition-colors hover:bg-surface-container-low focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30">
                     <p className="text-title-md font-semibold text-primary">{stats.followingCount}</p>
-                    <p className="mt-0.5 text-caption font-semibold text-secondary">{t("social.following")}</p>
-                  </div>
+                    <p className="mt-0.5 text-caption text-secondary">{t("social.following")}</p>
+                  </Link>
                 </div>
-                {user?.username ? (
-                  <Link href={`/user/${user.username}`} className="mt-4 inline-flex h-9 items-center justify-center rounded-lg border border-outline-variant/30 px-3 text-caption font-semibold text-primary transition-colors hover:bg-surface-container-low">
-                    {t("social.viewPublicProfile")}
+              </div>
+            </div>
+            <div className="mt-4 min-w-0">
+              <div className="flex flex-wrap items-center gap-2">
+                <h2 className="break-words text-title-lg font-semibold text-primary">{profileName}</h2>
+                {user.studentStatus === "verified" ? <VerifiedBadge /> : <Badge tone="warning">{verificationLabel}</Badge>}
+              </div>
+              <p className="mt-0.5 break-words text-body-sm font-semibold text-secondary">
+                {user.username ? `@${user.username}` : t("social.usernamePending")}
+              </p>
+              <p className="mt-2 text-body-sm font-semibold text-primary">{universityLabel}</p>
+              {user.bio ? <p className="mt-2 max-w-2xl whitespace-pre-wrap break-words text-body-sm text-primary">{user.bio}</p> : null}
+              <div className="mt-4 flex flex-wrap gap-2">
+                <Link href="/app/user/settings" className="inline-flex h-11 items-center justify-center gap-2 rounded-lg bg-primary px-3 text-caption font-semibold text-on-primary transition-opacity hover:opacity-85 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30">
+                  <span className="material-symbols-outlined text-[17px]" aria-hidden="true">edit</span>
+                  {t("social.editProfile")}
+                </Link>
+                {user.username ? (
+                  <Link href={`/user/${user.username}`} className="inline-flex h-11 items-center justify-center gap-2 rounded-lg border border-outline-variant/50 px-3 text-caption font-semibold text-primary transition-colors hover:bg-surface-container-low focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30">
+                    <span className="material-symbols-outlined text-[17px]" aria-hidden="true">ios_share</span>
+                    {t("social.shareProfile")}
                   </Link>
                 ) : null}
+                <Link href="/app/user/pass" className="inline-flex h-11 items-center justify-center gap-2 rounded-lg border border-outline-variant/50 px-3 text-caption font-semibold text-primary transition-colors hover:bg-surface-container-low focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30">
+                  <span className="material-symbols-outlined text-[17px]" aria-hidden="true">qr_code_2</span>
+                  {t("social.studentPass")}
+                </Link>
               </div>
             </div>
           </div>
 
-          <nav className="flex gap-2 overflow-x-auto rounded-full border border-outline-variant/30 bg-surface-container-lowest p-1 shadow-[0_1px_3px_rgba(0,0,0,0.04)]" aria-label={t("social.profileSections")}>
-            {[
-              { href: "#posts", icon: "forum", label: t("social.posts") },
-              { href: "#student-pass", icon: "qr_code_2", label: t("social.studentPass") }
-            ].map((item) => (
-              <Link
-                key={item.label}
-                href={item.href}
-                className="inline-flex h-9 shrink-0 items-center justify-center gap-2 rounded-full px-3 text-caption font-semibold text-primary transition-colors hover:bg-surface-container-low"
-              >
-                <span className="material-symbols-outlined text-[18px]" aria-hidden="true">{item.icon}</span>
-                {item.label}
-              </Link>
-            ))}
+          <nav className="mt-3 flex border-b border-outline-variant/30" aria-label={t("social.profileSections")}>
+            <Link href="#posts" className="inline-flex h-11 flex-1 items-center justify-center border-b-2 border-primary px-3 text-caption font-semibold text-primary">
+              {t("social.posts")}
+            </Link>
+            <Link href="#student-pass" className="inline-flex h-11 flex-1 items-center justify-center border-b-2 border-transparent px-3 text-caption font-semibold text-secondary transition-colors hover:border-outline hover:text-primary">
+              {t("social.studentPass")}
+            </Link>
           </nav>
 
-          <section id="posts" className="scroll-mt-24">
-            <div className="mb-3 flex items-center justify-between gap-3">
-              <h2 className="text-headline-md font-semibold text-primary">{t("social.posts")}</h2>
-              {user?.universitySlug ? <Badge tone="muted">{user.universitySlug}</Badge> : null}
+          <section id="posts" className="scroll-mt-24 pt-4">
+            <div className="mb-2 flex items-center justify-between gap-3">
+              <h2 className="text-title-lg font-semibold text-primary">{t("social.posts")}</h2>
+              {user.universitySlug ? <Badge tone="muted">{user.universitySlug}</Badge> : null}
             </div>
             <FeedList
               posts={posts}
@@ -1215,23 +1389,23 @@ export function ProfileScreen({
             />
           </section>
 
-          <section id="student-pass" className="scroll-mt-24 space-y-3">
-            <div>
-              <h2 className="text-headline-md font-semibold text-primary">{t("social.studentPass")}</h2>
+          <section id="student-pass" className="scroll-mt-24 border-t border-outline-variant/30 pt-5">
+            <div className="mb-3">
+              <h2 className="text-title-lg font-semibold text-primary">{t("social.studentPass")}</h2>
               <p className="mt-1 text-body-sm text-secondary">{t("social.studentPassDescription")}</p>
             </div>
-            <WalletPassSection device={device} showHeader={false} />
+            <WalletPassSection device={device} user={user} showHeader={false} />
           </section>
         </div>
 
-        <aside className="space-y-5">
-          <div className="rounded-2xl border border-outline-variant/30 bg-surface-container-lowest p-5 shadow-[0_1px_3px_rgba(0,0,0,0.04)]">
+        <aside className="hidden space-y-4 xl:block">
+          <div className="rounded-xl border border-outline-variant/30 bg-surface-container-lowest p-4">
             <h2 className="text-label-lg font-semibold text-primary">{t("social.campusVerification")}</h2>
             <p className="mt-1 text-body-sm text-secondary">{t("social.campusVerificationDetail")}</p>
             <div className="mt-4 space-y-3 text-label-md">
-              <div className="flex items-center justify-between gap-3">
+              <div className="flex items-start justify-between gap-3">
                 <span className="text-secondary">{t("social.university")}</span>
-                <span className="text-right font-semibold text-primary">{universityLabel}</span>
+                <span className="max-w-[150px] text-right font-semibold text-primary">{universityLabel}</span>
               </div>
               <div className="flex items-center justify-between gap-3">
                 <span className="text-secondary">{t("social.status")}</span>
@@ -1239,7 +1413,6 @@ export function ProfileScreen({
               </div>
             </div>
           </div>
-          <LogoutCard className="md:hidden" />
         </aside>
       </div>
     </section>

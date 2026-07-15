@@ -43,7 +43,7 @@ export function RoleBasedAppShell({
       <div className="min-h-dvh bg-background text-on-background">
         <Sidebar currentPath={pathname} navItems={navItems} role={role} onLogout={handleLogout} />
         <MobileTopBar />
-        <main className={cn("mx-auto min-h-dvh max-w-[1280px] px-margin-mobile pt-[72px] md:ml-[260px] md:px-7 md:py-7 lg:px-9", hasBottomNav ? "pb-[calc(64px+env(safe-area-inset-bottom))]" : "pb-8", "md:pb-8")}>
+        <main className={cn("mx-auto min-h-dvh max-w-[1280px] px-margin-mobile pt-[72px] md:ml-[260px] md:px-7 md:py-7 lg:px-9", hasBottomNav ? "pb-[calc(80px+env(safe-area-inset-bottom))]" : "pb-8", "md:pb-8")}>
           {children}
         </main>
         {hasBottomNav && <MobileBottomNav navItems={navItems} currentPath={pathname} />}

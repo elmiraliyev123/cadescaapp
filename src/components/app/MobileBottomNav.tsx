@@ -6,8 +6,8 @@ import { useLanguage } from "@/lib/i18n";
 export function MobileBottomNav({ navItems, currentPath }: { navItems: NavItem[]; currentPath: string }) {
   const { t } = useLanguage();
   return (
-    <nav className="fixed bottom-0 left-0 right-0 z-50 border-t border-outline-variant/20 bg-surface/95 px-2 pb-[max(6px,env(safe-area-inset-bottom))] pt-1 backdrop-blur md:hidden">
-      <div className="grid gap-0.5" style={{ gridTemplateColumns: `repeat(${navItems.length}, minmax(0, 1fr))` }}>
+    <nav className="fixed bottom-0 left-0 right-0 z-50 border-t border-outline-variant/30 bg-surface/95 px-2 pb-[max(8px,env(safe-area-inset-bottom))] pt-1.5 backdrop-blur md:hidden">
+      <div className="grid items-center gap-0.5" style={{ gridTemplateColumns: `repeat(${navItems.length}, minmax(0, 1fr))` }}>
         {navItems.map((item) => {
           const active = currentPath === item.href || currentPath.startsWith(`${item.href}/`);
           const isCreate = item.href.endsWith("/create");
@@ -17,11 +17,11 @@ export function MobileBottomNav({ navItems, currentPath }: { navItems: NavItem[]
               <Link
                 key={item.href}
                 href={item.href}
-                className="flex items-center justify-center py-1"
+                className="flex items-center justify-center py-0.5"
                 aria-label={t(item.i18nKey)}
               >
-                <span className="flex h-11 w-11 items-center justify-center rounded-full bg-primary text-on-primary shadow-md">
-                  <span className="material-symbols-outlined text-[24px]" aria-hidden="true">add</span>
+                <span className="flex aspect-square h-14 w-14 shrink-0 items-center justify-center rounded-full bg-primary text-on-primary shadow-md transition-transform active:scale-95">
+                  <span className="material-symbols-outlined text-[25px]" aria-hidden="true">add</span>
                 </span>
               </Link>
             );
@@ -32,7 +32,7 @@ export function MobileBottomNav({ navItems, currentPath }: { navItems: NavItem[]
               key={item.href}
               href={item.href}
               className={cn(
-                "flex min-w-0 flex-col items-center justify-center gap-0.5 rounded-xl px-1 py-1.5 transition-colors",
+                "flex min-h-14 min-w-0 flex-col items-center justify-center gap-0.5 rounded-xl px-1 py-1.5 transition-colors active:scale-95",
                 active ? "text-primary" : "text-secondary hover:text-primary"
               )}
             >

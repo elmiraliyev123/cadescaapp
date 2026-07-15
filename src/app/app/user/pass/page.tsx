@@ -1,5 +1,6 @@
 import { headers } from "next/headers";
 import { WalletPassSection, type DeviceType } from "@/components/screens/WalletPassSection";
+import { getCurrentStudentContext } from "@/lib/server/social";
 
 function detectDevice(userAgent: string): DeviceType {
   const ua = userAgent.toLowerCase();
@@ -14,6 +15,7 @@ export default async function UserPassRoute() {
   const headerStore = await headers();
   const userAgent = headerStore.get("user-agent") ?? "";
   const device = detectDevice(userAgent);
+  const user = await getCurrentStudentContext();
 
-  return <WalletPassSection device={device} />;
+  return <WalletPassSection device={device} user={user} />;
 }

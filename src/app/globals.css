@@ -6,7 +6,7 @@ html,
 body {
   margin: 0;
   padding: 0;
-  background: #f7f7f8;
+  background: #fafafa;
   color: #050505;
 }
 
@@ -19,6 +19,19 @@ input,
 textarea,
 select {
   font: inherit;
+}
+
+button,
+a,
+input,
+textarea,
+select {
+  -webkit-tap-highlight-color: transparent;
+}
+
+:focus-visible {
+  outline: 2px solid #000;
+  outline-offset: 2px;
 }
 
 .material-symbols-outlined {
@@ -58,11 +71,11 @@ select {
 
 @layer components {
   .premium-card {
-    @apply min-w-0 rounded-2xl border border-outline-variant/30 bg-surface-container-lowest shadow-[0_1px_3px_rgba(0,0,0,0.04)];
+    @apply min-w-0 rounded-xl border border-outline-variant/30 bg-surface-container-lowest;
   }
 
   .premium-card-muted {
-    @apply min-w-0 rounded-2xl border border-outline-variant/30 bg-surface-container-low;
+    @apply min-w-0 rounded-xl border border-outline-variant/30 bg-surface-container-low;
   }
 
   .section-grid {
