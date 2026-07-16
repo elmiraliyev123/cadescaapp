@@ -73,6 +73,7 @@ export type SocialActivityItem = {
   type: "like" | "comment" | "follow";
   actorName: string;
   actorUsername: string | null;
+  actorAvatarUrl: string | null;
   postId: string;
   postPreview: string;
   commentBody: string | null;
@@ -558,9 +559,9 @@ function requireActiveUser(user: CurrentStudentContext | null): asserts user is 
   }
 }
 
-function normalizePostBody(value: FormDataEntryValue | string | null | undefined, maxLength: number) {
+function normalizePostBody(value: FormDataEntryValue | string | null | undefined, maxLength: number, allowEmpty = false) {
   const body = String(value || "").trim();
-  if (!body) throw new Error("post_body_required");
+  if (!body && !allowEmpty) throw new Error("post_body_required");
   if (body.length > maxLength) throw new Error("post_body_too_long");
   return body;
 }
@@ -977,8 +978,8 @@ export async function createUniversityPost(input: { body: string; imageUrl?: str
   const user = await getCurrentStudentContext();
   requireVerifiedUniversityStudent(user);
 
-  const body = normalizePostBody(input.body, 1000);
   const imageUrl = input.imagePath || normalizeOptionalImageUrl(input.imageUrl);
+  const body = normalizePostBody(input.body, 1000, Boolean(imageUrl));
   const pool = await getReadyPool();
 
   await pool.query(
@@ -1244,6 +1245,7 @@ export async function listSocialActivity(user: CurrentStudentContext, limit = 40
     type: "like" | "comment" | "follow";
     actor_name: string;
     actor_username: string | null;
+    actor_avatar_url: string | null;
     post_id: string;
     post_preview: string;
     comment_body: string | null;
@@ -1255,6 +1257,7 @@ export async function listSocialActivity(user: CurrentStudentContext, limit = 40
         'like'::text as type,
         coalesce(actor.display_name, actor.name) as actor_name,
         actor.username as actor_username,
+        actor.avatar_url as actor_avatar_url,
         post.id::text as post_id,
         left(post.body, 120) as post_preview,
         null::text as comment_body,
@@ -1273,6 +1276,7 @@ export async function listSocialActivity(user: CurrentStudentContext, limit = 40
         'comment'::text as type,
         coalesce(actor.display_name, actor.name) as actor_name,
         actor.username as actor_username,
+        actor.avatar_url as actor_avatar_url,
         post.id::text as post_id,
         left(post.body, 120) as post_preview,
         comment.body as comment_body,
@@ -1297,6 +1301,7 @@ export async function listSocialActivity(user: CurrentStudentContext, limit = 40
           'follow'::text as type,
           coalesce(actor.display_name, actor.name) as actor_name,
           actor.username as actor_username,
+          actor.avatar_url as actor_avatar_url,
           ''::text as post_id,
           ''::text as post_preview,
           null::text as comment_body,
@@ -1322,11 +1327,13 @@ export async function listSocialActivity(user: CurrentStudentContext, limit = 40
     rows = result.rows;
   }
 
+  const avatarUrls = await resolveAvatarUrls(rows.map((row) => row.actor_avatar_url));
   return rows.map<SocialActivityItem>((row) => ({
     id: row.id,
     type: row.type,
     actorName: row.actor_name,
     actorUsername: row.actor_username,
+    actorAvatarUrl: row.actor_avatar_url ? avatarUrls.get(row.actor_avatar_url) || null : null,
     postId: row.post_id,
     postPreview: row.post_preview,
     commentBody: row.comment_body,

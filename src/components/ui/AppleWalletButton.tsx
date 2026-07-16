@@ -1,20 +1,21 @@
 type AppleWalletButtonProps = {
   passUrl: string;
   className?: string;
+  label?: string;
 };
 
 /**
  * "Add to Apple Wallet" button following official Apple brand guidelines.
  * Uses the standard black pill shape with the Apple Wallet logo inline SVG.
  */
-export function AppleWalletButton({ passUrl, className = "" }: AppleWalletButtonProps) {
+export function AppleWalletButton({ passUrl, className = "", label = "Add to Apple Wallet" }: AppleWalletButtonProps) {
   return (
     <a
       href={passUrl}
       target="_blank"
       rel="noopener noreferrer"
       className={`inline-flex items-center justify-center gap-2 rounded-[12px] bg-black px-5 py-3 text-white no-underline transition-transform active:scale-[0.97] hover:bg-[#1a1a1a] ${className}`}
-      aria-label="Add to Apple Wallet"
+      aria-label={label}
     >
       {/* Apple Wallet icon */}
       <svg
@@ -39,10 +40,7 @@ export function AppleWalletButton({ passUrl, className = "" }: AppleWalletButton
           />
         </g>
       </svg>
-      <span className="flex flex-col items-start leading-tight">
-        <span className="text-[10px] font-normal tracking-wide opacity-90">Add to</span>
-        <span className="text-[15px] font-semibold tracking-[-0.01em]">Apple Wallet</span>
-      </span>
+      <span className="text-[15px] font-semibold tracking-[-0.01em]">{label}</span>
     </a>
   );
 }

@@ -33,7 +33,7 @@ function revalidateSocialPaths() {
   }
 }
 
-function friendlyMessage(error: unknown) {
+function friendlyMessage(error: unknown, fallback = "social.actionFailed") {
   const message = error instanceof Error ? error.message : "";
   if (message === "verified_university_student_required") {
     return "social.verifiedAccessRequired";
@@ -48,7 +48,7 @@ function friendlyMessage(error: unknown) {
   if (message === "image_moderation_failed") return "social.imageScanFailed";
   if (message === "profile_not_found") return "social.profileNotFound";
   if (message === "cannot_follow_self") return "social.cannotFollowSelf";
-  return "social.actionFailed";
+  return fallback;
 }
 
 function errorReason(error: unknown) {
@@ -92,7 +92,7 @@ export async function createPostAction(_previous: SocialFormState, formData: For
     revalidateSocialPaths();
   } catch (error) {
     logSocialAction("create_post", "failed", { reason: errorReason(error) });
-    return { ok: false, message: friendlyMessage(error) };
+    return { ok: false, message: friendlyMessage(error, "social.postPublishFailed") };
   }
 
   if (shouldRedirect) {
@@ -118,7 +118,6 @@ export async function togglePostLikeAction(formData: FormData) {
     logSocialAction("toggle_post_like", "success");
   } catch (error) {
     logSocialAction("toggle_post_like", "failed", { reason: errorReason(error) });
-    throw error;
   }
 }
 
@@ -156,7 +155,6 @@ export async function deletePostAction(formData: FormData) {
     logSocialAction("delete_post", "success");
   } catch (error) {
     logSocialAction("delete_post", "failed", { reason: errorReason(error) });
-    throw error;
   }
 }
 
@@ -177,7 +175,6 @@ export async function reportPostAction(formData: FormData) {
     logSocialAction("report_post", "success");
   } catch (error) {
     logSocialAction("report_post", "failed", { reason: errorReason(error) });
-    throw error;
   }
 }
 
@@ -196,6 +193,5 @@ export async function toggleFollowAction(formData: FormData) {
     logSocialAction("toggle_follow", "success");
   } catch (error) {
     logSocialAction("toggle_follow", "failed", { reason: errorReason(error) });
-    throw error;
   }
 }

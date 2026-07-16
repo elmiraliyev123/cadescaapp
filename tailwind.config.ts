@@ -60,7 +60,8 @@ const config: Config = {
         "surface-container-high": "#e8e8ea"
       },
       borderRadius: {
-        lg: "0.5rem",
+        md: "0.5rem",
+        lg: "0.625rem",
         xl: "0.75rem"
       },
       spacing: {
@@ -88,7 +89,13 @@ const config: Config = {
         "title-md": ["16px", { lineHeight: "24px", letterSpacing: "0", fontWeight: "600" }],
         "title-lg": ["20px", { lineHeight: "28px", letterSpacing: "-0.01em", fontWeight: "600" }],
         "label-lg": ["16px", { lineHeight: "24px", letterSpacing: "0.01em", fontWeight: "600" }],
-        "headline-sm": ["20px", { lineHeight: "28px", letterSpacing: "-0.01em", fontWeight: "600" }]
+        "headline-sm": ["20px", { lineHeight: "28px", letterSpacing: "-0.01em", fontWeight: "600" }],
+        "social-page": ["26px", { lineHeight: "32px", letterSpacing: "-0.025em", fontWeight: "650" }],
+        "social-section": ["20px", { lineHeight: "28px", letterSpacing: "-0.015em", fontWeight: "600" }],
+        "social-name": ["15px", { lineHeight: "20px", letterSpacing: "0", fontWeight: "600" }],
+        "social-body": ["16px", { lineHeight: "24px", letterSpacing: "0", fontWeight: "400" }],
+        "social-meta": ["13px", { lineHeight: "20px", letterSpacing: "0", fontWeight: "400" }],
+        "social-nav": ["12px", { lineHeight: "16px", letterSpacing: "0", fontWeight: "500" }]
       },
       boxShadow: {
         soft: "0 1px 2px rgba(26, 28, 29, 0.04)",

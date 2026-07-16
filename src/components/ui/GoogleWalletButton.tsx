@@ -1,20 +1,21 @@
 type GoogleWalletButtonProps = {
   passUrl: string;
   className?: string;
+  label?: string;
 };
 
 /**
  * "Add to Google Wallet" button following official Google Wallet brand guidelines.
  * Uses the standard black pill shape with the Google Wallet "G" logo inline SVG.
  */
-export function GoogleWalletButton({ passUrl, className = "" }: GoogleWalletButtonProps) {
+export function GoogleWalletButton({ passUrl, className = "", label = "Add to Google Wallet" }: GoogleWalletButtonProps) {
   return (
     <a
       href={passUrl}
       target="_blank"
       rel="noopener noreferrer"
       className={`inline-flex items-center justify-center gap-2.5 rounded-[12px] bg-black px-5 py-3 text-white no-underline transition-transform active:scale-[0.97] hover:bg-[#1a1a1a] ${className}`}
-      aria-label="Add to Google Wallet"
+      aria-label={label}
     >
       {/* Google Wallet icon */}
       <svg
@@ -36,10 +37,7 @@ export function GoogleWalletButton({ passUrl, className = "" }: GoogleWalletButt
           <rect x="3" y="9" width="18" height="12" rx="2.5" fill="#34A853" transform="rotate(4 12 15)" />
         </g>
       </svg>
-      <span className="flex flex-col items-start leading-tight">
-        <span className="text-[10px] font-normal tracking-wide opacity-90">Add to</span>
-        <span className="text-[15px] font-semibold tracking-[-0.01em]">Google Wallet</span>
-      </span>
+      <span className="text-[15px] font-semibold tracking-[-0.01em]">{label}</span>
     </a>
   );
 }

@@ -11,6 +11,6 @@ export default async function UserSettingsRoute() {
     console.error("[user_settings] unavailable", {
       reason: error instanceof Error ? error.message : "unknown"
     });
-    return <SocialUnavailableScreen message="Campus community is almost ready." />;
+    return <SocialUnavailableScreen />;
   }
 }

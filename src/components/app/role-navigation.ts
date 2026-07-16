@@ -21,7 +21,7 @@ export const roleNavItems: Record<DemoRole, NavItem[]> = {
     { label: "Home", href: "/app/user/home", icon: "home", i18nKey: "common.home" },
     { label: "Explore", href: "/app/user/explore", icon: "search", i18nKey: "common.explore" },
     { label: "Create", href: "/app/user/create", icon: "add_box", i18nKey: "common.create" },
-    { label: "Activity", href: "/app/user/activity", icon: "notifications", i18nKey: "common.activity" },
+    { label: "Notifications", href: "/app/user/activity", icon: "notifications", i18nKey: "social.activityTitle" },
     { label: "Profile", href: "/app/user/profile", icon: "person", i18nKey: "common.profile" }
   ],
   employee: [

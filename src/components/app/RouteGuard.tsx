@@ -12,6 +12,7 @@ import {
   publicUserAppEnabled
 } from "@/lib/appConfig";
 import { authLoginHref } from "@/lib/authOrigins";
+import { useLanguage } from "@/lib/i18n";
 
 function loginRouteFor(role: DemoRole, pathname = "/app/user/home") {
   if (role === "merchant") return "/merchant/login";
@@ -56,6 +57,7 @@ export function RouteGuard({
   const pathname = usePathname();
   const [isAuthorized, setIsAuthorized] = useState(false);
   const { state, hydrated, dispatch } = useDemoState();
+  const { t } = useLanguage();
 
   useEffect(() => {
     if (!hydrated) {
@@ -202,8 +204,8 @@ export function RouteGuard({
     return (
       <main className="flex min-h-dvh items-center justify-center bg-background px-margin-mobile text-on-background">
         <div className="flex items-center gap-3 rounded-lg border border-outline-variant/70 bg-surface-container-lowest px-4 py-3 text-label-md font-semibold text-secondary">
-          <span className="material-symbols-outlined text-[20px]" aria-hidden="true">sync</span>
-          <span>Redirecting...</span>
+          <span className="material-symbols-outlined icon-ui animate-spin" aria-hidden="true">progress_activity</span>
+          <span>{t("social.loading")}</span>
         </div>
       </main>
     );

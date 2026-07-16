@@ -3,7 +3,8 @@ import { useLanguage } from "@/lib/i18n";
 
 export function Toast({ message, visible }: { message: string; visible: boolean }) {
   const { t } = useLanguage();
-  const label = message.includes(".") ? t(message as any) : message;
+  const translatedMessage = message.includes(".") ? t(message as any) : message;
+  const label = translatedMessage === message ? message : translatedMessage;
 
   return (
     <div
@@ -15,7 +16,7 @@ export function Toast({ message, visible }: { message: string; visible: boolean 
       aria-live="polite"
     >
       <div className="flex items-center gap-3">
-        <span className="material-symbols-outlined text-[20px]" aria-hidden="true">check_circle</span>
+        <span className="material-symbols-outlined icon-ui" aria-hidden="true">info</span>
         <span className="text-label-md font-semibold">{label}</span>
       </div>
     </div>

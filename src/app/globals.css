@@ -8,6 +8,7 @@ body {
   padding: 0;
   background: #fafafa;
   color: #050505;
+  text-rendering: optimizeLegibility;
 }
 
 * {
@@ -34,25 +35,69 @@ select {
   outline-offset: 2px;
 }
 
-.material-symbols-outlined {
-  font-family: "Material Symbols Outlined";
-  font-weight: normal;
-  font-style: normal;
-  font-size: 24px;
-  line-height: 1;
-  letter-spacing: normal;
-  text-transform: none;
-  display: inline-block;
-  white-space: nowrap;
-  word-wrap: normal;
-  direction: ltr;
-  -webkit-font-feature-settings: "liga";
-  -webkit-font-smoothing: antialiased;
-  font-variation-settings: "FILL" 0, "wght" 300, "GRAD" 0, "opsz" 24;
+@layer base {
+  .material-symbols-outlined {
+    font-family: "Material Symbols Outlined";
+    font-weight: normal;
+    font-style: normal;
+    font-size: var(--material-symbol-size, 24px) !important;
+    line-height: 1;
+    letter-spacing: normal;
+    text-transform: none;
+    display: inline-block;
+    white-space: nowrap;
+    word-wrap: normal;
+    direction: ltr;
+    -webkit-font-feature-settings: "liga";
+    -webkit-font-smoothing: antialiased;
+    font-variation-settings: "FILL" 0, "wght" 300, "GRAD" 0, "opsz" 24;
+  }
+
+  .material-symbols-filled {
+    font-variation-settings: "FILL" 1, "wght" 300, "GRAD" 0, "opsz" 24;
+  }
 }
 
-.material-symbols-filled {
-  font-variation-settings: "FILL" 1, "wght" 300, "GRAD" 0, "opsz" 24;
+@layer utilities {
+  .icon-overlay {
+    --material-symbol-size: 9px;
+  }
+
+  .icon-badge {
+    --material-symbol-size: 15px;
+  }
+
+  .icon-inline {
+    --material-symbol-size: 18px;
+  }
+
+  .icon-ui {
+    --material-symbol-size: 20px;
+  }
+
+  .icon-media {
+    --material-symbol-size: 22px;
+  }
+
+  .icon-action {
+    --material-symbol-size: 23px;
+  }
+
+  .icon-nav {
+    --material-symbol-size: 24px;
+  }
+
+  .icon-create {
+    --material-symbol-size: 26px;
+  }
+
+  .icon-empty {
+    --material-symbol-size: 28px;
+  }
+
+  .icon-pass {
+    --material-symbol-size: 32px;
+  }
 }
 
 .no-scrollbar::-webkit-scrollbar {
@@ -80,6 +125,14 @@ select {
 
   .section-grid {
     @apply grid gap-4 md:gap-5;
+  }
+
+  .social-surface {
+    @apply min-w-0 border-b border-outline-variant/30 bg-surface-container-lowest;
+  }
+
+  .social-icon {
+    @apply material-symbols-outlined text-[23px];
   }
 }
 
