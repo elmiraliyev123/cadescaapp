@@ -7,6 +7,10 @@ export function getAppUrl() {
   return normalizePublicUrl(process.env.NEXT_PUBLIC_APP_ORIGIN || process.env.NEXT_PUBLIC_APP_URL, "https://app.cadesca.com");
 }
 
+export function getPublicUrl() {
+  return normalizePublicUrl(process.env.NEXT_PUBLIC_SITE_ORIGIN, "https://cadesca.com");
+}
+
 export function getAuthUrl() {
   return normalizePublicUrl(process.env.NEXT_PUBLIC_AUTH_ORIGIN || process.env.NEXT_PUBLIC_AUTH_URL, "https://auth.cadesca.com");
 }
@@ -24,6 +28,7 @@ export function getApiUrl() {
 }
 
 export const appUrl = getAppUrl();
+export const publicUrl = getPublicUrl();
 export const authUrl = getAuthUrl();
 export const merchantUrl = getMerchantUrl();
 export const adminUrl = getAdminUrl();

@@ -71,6 +71,10 @@ function isAppPath(pathname: string) {
   return pathname === "/app" || pathname.startsWith("/app/");
 }
 
+function isPublicPostPath(pathname: string) {
+  return pathname === "/post" || pathname.startsWith("/post/");
+}
+
 function isNavigationMethod(method: string) {
   return method === "GET" || method === "HEAD";
 }
@@ -278,6 +282,14 @@ function appOrigin(request: NextRequest) {
   return publicOrigin("NEXT_PUBLIC_APP_ORIGIN", "https://app.cadesca.com", request);
 }
 
+function publicSiteOrigin(request: NextRequest) {
+  if (isLocalHost(normalizedHost(request))) {
+    return `${request.nextUrl.protocol}//${request.nextUrl.host}`;
+  }
+
+  return (process.env.NEXT_PUBLIC_SITE_ORIGIN?.trim() || "https://cadesca.com").replace(/\/+$/, "");
+}
+
 function isAuthRoute(pathname: string) {
   return (
     pathname === "/login" ||
@@ -376,6 +388,24 @@ export async function middleware(request: NextRequest) {
 
   const localeResolution = resolveLocale(request);
   const passThroughReason = appRequestPassThroughReason(request);
+
+  if (isPublicPostPath(pathname)) {
+    const shouldUseCanonicalHost =
+      host === "app.cadesca.com" ||
+      host === "auth.cadesca.com" ||
+      host === "merchant.cadesca.com" ||
+      host === "adminlog.cadesca.com";
+
+    if (shouldUseCanonicalHost) {
+      const target = new URL(`${pathname}${request.nextUrl.search}`, publicSiteOrigin(request));
+      return finalizeResponse(
+        request,
+        applyLocaleToResponse(redirectAbsolute(target.toString()), localeResolution)
+      );
+    }
+
+    return finalizeResponse(request, localizedNextResponse(request, localeResolution));
+  }
 
   if (passThroughReason) {
     logAppRequestHandling(request, "pass_through", passThroughReason);

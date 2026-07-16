@@ -22,7 +22,7 @@ export function MobileBottomNav({ navItems, currentPath }: { navItems: NavItem[]
   }, []);
   return (
     <nav className="fixed bottom-0 left-0 right-0 z-50 border-t border-outline-variant/25 bg-surface/95 px-1 pb-[max(8px,env(safe-area-inset-bottom))] pt-1.5 backdrop-blur md:hidden">
-      <div className="grid min-h-[64px] items-center" style={{ gridTemplateColumns: `repeat(${navItems.length}, minmax(0, 1fr))` }}>
+      <div className="grid min-h-[68px] items-center" style={{ gridTemplateColumns: `repeat(${navItems.length}, minmax(0, 1fr))` }}>
         {navItems.map((item) => {
           const active = currentPath === item.href || currentPath.startsWith(`${item.href}/`);
           const isCreate = item.href.endsWith("/create");
@@ -65,7 +65,7 @@ export function MobileBottomNav({ navItems, currentPath }: { navItems: NavItem[]
                   <span className="absolute right-0 top-0 h-1.5 w-1.5 rounded-full bg-primary ring-2 ring-surface" aria-hidden="true" />
                 ) : null}
               </span>
-              <span className="max-w-full truncate text-center text-[12px] font-medium leading-4">
+              <span className="max-w-full whitespace-normal text-center text-[11.5px] font-medium leading-[14px] [overflow-wrap:anywhere]">
                 {t(item.i18nKey)}
               </span>
               {active ? <span className="h-0.5 w-3 rounded-full bg-primary" /> : null}

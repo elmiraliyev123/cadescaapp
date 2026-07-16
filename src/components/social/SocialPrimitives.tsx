@@ -89,7 +89,7 @@ export function VerifiedBadge({ inverse = false, className }: { inverse?: boolea
         <span
           id={tooltipId}
           role="tooltip"
-          className="fixed bottom-[calc(88px+env(safe-area-inset-bottom))] left-4 right-4 z-30 w-auto rounded-lg border border-outline-variant/35 bg-surface-container-lowest px-3 py-2 text-[13px] font-normal leading-5 text-secondary shadow-md sm:absolute sm:bottom-auto sm:left-0 sm:right-auto sm:top-7 sm:w-60"
+          className="fixed bottom-[calc(var(--verified-tooltip-bottom,88px)+env(safe-area-inset-bottom))] left-4 right-4 z-30 w-auto rounded-lg border border-outline-variant/35 bg-surface-container-lowest px-3 py-2 text-[13px] font-normal leading-5 text-secondary shadow-md sm:absolute sm:bottom-auto sm:left-0 sm:right-auto sm:top-7 sm:w-60"
         >
           {t("social.verifiedBadgeTooltip")}
         </span>
@@ -115,7 +115,7 @@ export function SocialPageHeader({
     <header className="relative mx-auto mb-4 flex min-h-14 w-full max-w-[984px] items-center justify-between gap-2 border-b border-outline-variant/25 pb-3">
       {leadingAction ? <div className="shrink-0">{leadingAction}</div> : null}
       <div className={cn("min-w-0 flex-1", centered && "pointer-events-none absolute left-1/2 max-w-[calc(100%-168px)] -translate-x-1/2 text-center")}>
-        <h1 className="truncate text-social-page text-primary">{title}</h1>
+        <h1 className="break-words text-social-page text-primary">{title}</h1>
         {subtitle ? <p className="mt-0.5 truncate text-social-meta text-secondary">{subtitle}</p> : null}
       </div>
       {action ? <div className="shrink-0">{action}</div> : null}
@@ -211,7 +211,7 @@ export function FeatureBanner({
 }) {
   return (
     <article
-      className="group relative aspect-[16/10] w-[280px] flex-[0_0_280px] overflow-hidden rounded-xl bg-primary text-white"
+      className="group relative aspect-[16/10] w-[clamp(260px,76vw,290px)] flex-[0_0_clamp(260px,76vw,290px)] overflow-hidden rounded-xl bg-primary text-white"
       aria-label={`${title}. ${description}. ${status}`}
     >
       <img src={imageUrl} alt="" loading="lazy" className="absolute inset-0 h-full w-full object-cover transition-transform duration-300 group-hover:scale-[1.02]" />

@@ -980,12 +980,13 @@ export async function createUniversityPost(input: { body: string; imageUrl?: str
 
   const imageUrl = input.imagePath || normalizeOptionalImageUrl(input.imageUrl);
   const body = normalizePostBody(input.body, 1000, Boolean(imageUrl));
+  const visibility = input.imageUrl && !input.imagePath ? "university_only" : "public_preview";
   const pool = await getReadyPool();
 
   await pool.query(
-    `insert into public.university_posts (university_id, user_id, body, image_url)
-     values ($1, $2, $3, $4)`,
-    [user.universityId, user.id, body, imageUrl]
+    `insert into public.university_posts (university_id, user_id, body, image_url, visibility)
+     values ($1, $2, $3, $4, $5)`,
+    [user.universityId, user.id, body, imageUrl, visibility]
   );
 }
 

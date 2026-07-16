@@ -34,6 +34,7 @@ import {
 import { Badge } from "@/components/ui/Badge";
 import { Button, ButtonLink, IconButton, IconLink } from "@/components/ui/Button";
 import { InlineError } from "@/components/ui/InlineError";
+import { publicUrl } from "@/lib/appConfig";
 import { useLanguage, type Language } from "@/lib/i18n";
 import type {
   CurrentStudentContext,
@@ -514,7 +515,7 @@ function PostCard({ post }: { post: SocialPost }) {
   const visibleComments = commentsOpen ? post.comments : post.comments.slice(0, 1);
 
   async function sharePost() {
-    const url = `${window.location.origin}/post/${post.id}`;
+    const url = `${publicUrl}/post/${post.id}`;
     try {
       if (navigator.share) {
         await navigator.share({ text: post.body || undefined, url });
@@ -651,7 +652,7 @@ function FeedList({
   );
 }
 
-function SocialRightRail({ user, postCount }: { user: CurrentStudentContext; postCount?: number }) {
+function SocialRightRail({ user }: { user: CurrentStudentContext }) {
   const { t } = useLanguage();
   const community = campusCommunityName(user, t("social.defaultCampus"));
 
@@ -663,9 +664,6 @@ function SocialRightRail({ user, postCount }: { user: CurrentStudentContext; pos
           <span className="material-symbols-outlined icon-inline text-secondary" aria-hidden="true">public</span>
         </div>
         <p className="mt-1 text-[14px] font-normal leading-5 text-secondary">{community}</p>
-        {typeof postCount === "number" ? (
-          <p className="mt-4 text-caption font-semibold text-secondary">{postCount} {t("social.postsCount")}</p>
-        ) : null}
       </div>
       <div className="rounded-xl border border-outline-variant/30 bg-surface-container-lowest p-4">
         <div className="flex items-center justify-between gap-3">
@@ -709,7 +707,7 @@ export function HomeFeedScreen({ user, posts }: { user: CurrentStudentContext | 
               showCreateAction
             />
           </div>
-          <SocialRightRail user={user} postCount={posts.length} />
+          <SocialRightRail user={user} />
         </div>
       ) : (
         <VerificationGate user={user} />
@@ -759,7 +757,7 @@ export function ExploreScreen({ user, posts }: { user: CurrentStudentContext | n
       {isVerifiedStudent(user) ? (
         <div className="mx-auto grid w-full max-w-[984px] gap-6 xl:grid-cols-[minmax(0,680px)_280px]">
           <div className="min-w-0 space-y-5">
-            <div className="no-scrollbar flex snap-x snap-mandatory gap-3 overflow-x-auto pb-2">
+            <div className="no-scrollbar -mx-4 flex snap-x snap-mandatory gap-3 overflow-x-auto px-4 pb-2 pr-8 [scroll-padding-inline:16px] sm:mx-0 sm:px-0 sm:pr-6">
               {exploreFeatureCards.map((card) => (
                 <div key={card.titleKey} className="snap-start">
                   <FeatureBanner
@@ -773,9 +771,8 @@ export function ExploreScreen({ user, posts }: { user: CurrentStudentContext | n
               ))}
             </div>
             <div>
-              <div className="mb-2 flex items-center justify-between gap-3">
+              <div className="mb-2">
                 <h2 className="text-title-lg font-semibold text-primary">{t("social.campusPosts")}</h2>
-                <Badge tone="muted">{posts.length} {t("social.postsCount")}</Badge>
               </div>
               <FeedList
                 posts={posts}
@@ -783,7 +780,7 @@ export function ExploreScreen({ user, posts }: { user: CurrentStudentContext | n
               />
             </div>
           </div>
-          <SocialRightRail user={user} postCount={posts.length} />
+          <SocialRightRail user={user} />
         </div>
       ) : (
         <VerificationGate user={user} />
@@ -1264,16 +1261,16 @@ export function ProfileScreen({
               </p>
               <p className="mt-2 text-[14px] font-medium leading-5 text-primary">{universityLabel}</p>
               {user.bio ? <p className="mt-2 max-w-2xl whitespace-pre-wrap break-words text-[15px] font-normal leading-6 text-primary">{user.bio}</p> : null}
-              <div className="mt-4 grid grid-cols-1 gap-2 min-[360px]:grid-cols-2 sm:flex">
-                <ButtonLink href="/app/user/settings" className="px-2 text-[14px]">
+              <div className="mt-4 grid min-w-0 grid-cols-1 gap-2 min-[520px]:grid-cols-2">
+                <ButtonLink href="/app/user/settings" className="w-full min-w-0 px-4 text-[15px]">
                   {t("social.editProfile")}
                 </ButtonLink>
                 {user.username ? (
-                  <Button type="button" variant="secondary" onClick={shareProfile} className="px-2 text-[14px]">
+                  <Button type="button" variant="secondary" onClick={shareProfile} className="w-full min-w-0 px-4 text-[15px]">
                     {t("social.shareProfile")}
                   </Button>
                 ) : null}
-                <ButtonLink href="/app/user/pass" variant="secondary" className="px-2 text-[14px] min-[360px]:col-span-2 sm:col-span-1">
+                <ButtonLink href="/app/user/pass" variant="secondary" className="w-full min-w-0 px-4 text-[15px] min-[520px]:col-span-2">
                   {t("social.studentPass")}
                 </ButtonLink>
                 <span className="sr-only" role="status">{shareStatus}</span>
@@ -1281,11 +1278,11 @@ export function ProfileScreen({
             </div>
           </div>
 
-          <nav className="flex border-b border-outline-variant/30" aria-label={t("social.profileSections")}>
-            <Link href="#posts" className="inline-flex h-11 flex-1 items-center justify-center border-b-2 border-primary px-3 text-caption font-semibold text-primary">
+          <nav className="grid grid-cols-2 border-b border-outline-variant/30" aria-label={t("social.profileSections")}>
+            <Link href="#posts" className="inline-flex min-h-12 min-w-0 items-center justify-center border-b-2 border-primary px-2 py-2 text-center text-[13px] font-semibold leading-4 text-primary">
               {t("social.posts")}
             </Link>
-            <Link href="/app/user/pass" className="inline-flex h-11 flex-1 items-center justify-center border-b-2 border-transparent px-3 text-caption font-semibold text-secondary transition-colors hover:border-outline hover:text-primary">
+            <Link href="/app/user/pass" className="inline-flex min-h-12 min-w-0 items-center justify-center border-b-2 border-transparent px-2 py-2 text-center text-[13px] font-semibold leading-4 text-secondary transition-colors hover:border-outline hover:text-primary">
               {t("social.studentPass")}
             </Link>
           </nav>
@@ -1299,7 +1296,7 @@ export function ProfileScreen({
           </section>
 
         </div>
-        <SocialRightRail user={user} postCount={stats.postsCount} />
+        <SocialRightRail user={user} />
       </div>
     </section>
   );

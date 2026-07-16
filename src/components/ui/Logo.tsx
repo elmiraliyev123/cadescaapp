@@ -18,8 +18,8 @@ export function Logo({
         <img
           src="/cadesca-mark.png"
           alt="Cadesca"
-          width={32}
-          height={32}
+          width={560}
+          height={560}
           className={cn("h-8 w-8 object-contain max-w-full", imgClassName)}
           style={{
             width: 32,
@@ -37,10 +37,10 @@ export function Logo({
       <img
         src="/cadesca-logo.png"
         alt="Cadesca"
-        width={126}
-        height={32}
+        width={1290}
+        height={520}
         className={cn(
-          "h-auto object-contain max-w-full",
+          "block h-auto object-contain max-w-full",
           imgClassName || (maxWidth ? "w-auto" : "w-[116px] md:w-[126px]")
         )}
         style={{

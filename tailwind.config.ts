@@ -73,8 +73,27 @@ const config: Config = {
         unit: "8px"
       },
       fontFamily: {
-        sans: ["var(--font-plus-jakarta)", "Plus Jakarta Sans", "sans-serif"],
-        display: ["var(--font-plus-jakarta)", "Plus Jakarta Sans", "sans-serif"]
+        sans: [
+          "-apple-system",
+          "BlinkMacSystemFont",
+          "\"SF Pro Text\"",
+          "\"SF Pro Display\"",
+          "\"Segoe UI\"",
+          "Roboto",
+          "Helvetica",
+          "Arial",
+          "sans-serif"
+        ],
+        display: [
+          "-apple-system",
+          "BlinkMacSystemFont",
+          "\"SF Pro Display\"",
+          "\"Segoe UI\"",
+          "Roboto",
+          "Helvetica",
+          "Arial",
+          "sans-serif"
+        ]
       },
       fontSize: {
         "label-md": ["14px", { lineHeight: "20px", letterSpacing: "0.02em", fontWeight: "600" }],
@@ -90,9 +109,9 @@ const config: Config = {
         "title-lg": ["20px", { lineHeight: "28px", letterSpacing: "-0.01em", fontWeight: "600" }],
         "label-lg": ["16px", { lineHeight: "24px", letterSpacing: "0.01em", fontWeight: "600" }],
         "headline-sm": ["20px", { lineHeight: "28px", letterSpacing: "-0.01em", fontWeight: "600" }],
-        "social-page": ["26px", { lineHeight: "32px", letterSpacing: "-0.025em", fontWeight: "650" }],
-        "social-section": ["20px", { lineHeight: "28px", letterSpacing: "-0.015em", fontWeight: "600" }],
-        "social-name": ["15px", { lineHeight: "20px", letterSpacing: "0", fontWeight: "600" }],
+        "social-page": ["28px", { lineHeight: "34px", letterSpacing: "-0.02em", fontWeight: "700" }],
+        "social-section": ["21px", { lineHeight: "28px", letterSpacing: "-0.01em", fontWeight: "600" }],
+        "social-name": ["16px", { lineHeight: "22px", letterSpacing: "0", fontWeight: "600" }],
         "social-body": ["16px", { lineHeight: "24px", letterSpacing: "0", fontWeight: "400" }],
         "social-meta": ["13px", { lineHeight: "20px", letterSpacing: "0", fontWeight: "400" }],
         "social-nav": ["12px", { lineHeight: "16px", letterSpacing: "0", fontWeight: "500" }]

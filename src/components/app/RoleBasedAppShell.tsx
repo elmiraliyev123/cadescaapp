@@ -3,7 +3,7 @@
 import { usePathname, useRouter } from "next/navigation";
 import type { DemoRole, NavItem } from "@/lib/types";
 import { Sidebar } from "@/components/app/Sidebar";
-import { MobileTopBar } from "@/components/app/MobileTopBar";
+import { AppTopBar } from "@/components/app/AppTopBar";
 import { MobileBottomNav } from "@/components/app/MobileBottomNav";
 import { Toast } from "@/components/ui/Toast";
 import { useDemoState } from "@/lib/demoStore";
@@ -42,8 +42,8 @@ export function RoleBasedAppShell({
     <RouteGuard role={role}>
       <div className="min-h-dvh bg-background text-on-background">
         <Sidebar currentPath={pathname} navItems={navItems} role={role} onLogout={handleLogout} />
-        <MobileTopBar />
-        <main className={cn("mx-auto min-h-dvh max-w-[1280px] px-4 pt-[68px] md:ml-[260px] md:px-7 md:py-7 lg:px-9", hasBottomNav ? "pb-[calc(88px+env(safe-area-inset-bottom))]" : "pb-8", "md:pb-8")}>
+        <AppTopBar />
+        <main className={cn("mx-auto min-h-dvh max-w-[1280px] px-4 pt-[calc(128px+env(safe-area-inset-top))] md:ml-[260px] md:px-7 md:py-7 lg:px-9", hasBottomNav ? "pb-[calc(88px+env(safe-area-inset-bottom))]" : "pb-8", "md:pb-8")}>
           {children}
         </main>
         {hasBottomNav && <MobileBottomNav navItems={navItems} currentPath={pathname} />}

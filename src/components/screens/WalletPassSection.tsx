@@ -41,7 +41,7 @@ export function StudentPassCard({ user }: { user?: CurrentStudentContext | null 
   const university = user?.universityName || user?.legacyUniversityName || t("social.universityNotAssigned");
 
   return (
-    <div className="relative aspect-[1.62/1] w-full overflow-hidden rounded-xl bg-primary p-5 text-on-primary sm:p-6">
+    <div className="relative aspect-[1.62/1] w-full overflow-hidden rounded-2xl bg-primary p-5 text-on-primary sm:p-6">
       <div className="absolute -right-10 -top-10 h-36 w-36 rounded-full border border-white/15" aria-hidden="true" />
       <div className="absolute -bottom-16 right-16 h-40 w-40 rounded-full border border-white/10" aria-hidden="true" />
       <div className="relative flex items-start justify-between gap-4">
@@ -157,25 +157,11 @@ export function WalletPassSection({
         <SocialPageHeader title={t("social.studentPass")} />
       ) : null}
 
-      <div className="mx-auto max-w-[680px] space-y-3">
+      <div className="mx-auto max-w-[560px] space-y-4">
         <StudentPassCard user={user} />
 
-        <div className="border-y border-outline-variant/30 bg-surface-container-lowest px-1 py-4 sm:px-3">
-          <div className="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-4">
-            <div>
-              <p className="text-[13px] font-normal leading-5 text-secondary">{t("social.university")}</p>
-              <p className="text-[15px] font-semibold leading-5 text-primary">{user?.universityName || user?.legacyUniversityName || t("social.universityNotAssigned")}</p>
-            </div>
-            <div>
-              <p className="text-[13px] font-normal leading-5 text-secondary">{t("social.status")}</p>
-              <p className="inline-flex items-center gap-1.5 text-[15px] font-semibold leading-5 text-primary">
-                <span className="h-1.5 w-1.5 rounded-full bg-primary" aria-hidden="true" />
-                {t("social.verified")}
-              </p>
-            </div>
-          </div>
-
-          <div className="mt-4 flex flex-wrap gap-2">
+        <div>
+          <div className="grid grid-cols-1 gap-2 sm:flex sm:flex-wrap">
             {device === "android" && loading ? (
               <LoadingSkeleton className="h-11 w-full sm:w-44" />
             ) : null}
@@ -188,6 +174,7 @@ export function WalletPassSection({
             <Button
               variant={device === "ios" || (device === "android" && walletReady) ? "secondary" : "primary"}
               icon="qr_code_2"
+              className="w-full sm:w-auto"
               disabled={qrLoading}
               onClick={showQr}
             >
