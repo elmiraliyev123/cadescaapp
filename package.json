@@ -10,6 +10,7 @@
     "start": "next start",
     "build": "next build",
     "test:moderation": "node --conditions=react-server --import tsx scripts/test-moderation.ts",
+    "test:seo": "node --import tsx scripts/test-seo-structured-data.ts",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {

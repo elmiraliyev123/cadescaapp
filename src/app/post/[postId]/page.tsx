@@ -3,6 +3,14 @@ import { notFound } from "next/navigation";
 
 import { PublicPostPreview } from "@/components/public/PublicPostPreview";
 import { getAuthUrl, getPublicUrl } from "@/lib/appConfig";
+import {
+  publicPostDescription,
+  publicPostTitle
+} from "@/lib/seo/metadata";
+import {
+  buildDiscussionForumPostingStructuredData,
+  serializeJsonLd
+} from "@/lib/seo/structuredData";
 import { getPublicPostPreview } from "@/lib/server/publicPosts";
 
 type PublicPostPageProps = {
@@ -19,12 +27,6 @@ function authLink(pathname: "/signup" | "/login", next?: string) {
   return url.toString();
 }
 
-function metadataDescription(body: string) {
-  const compact = body.replace(/\s+/g, " ").trim();
-  if (!compact) return "A public post from a verified university student on Cadesca.";
-  return compact.length > 150 ? `${compact.slice(0, 147)}...` : compact;
-}
-
 export const dynamic = "force-dynamic";
 
 export async function generateMetadata({ params }: PublicPostPageProps): Promise<Metadata> {
@@ -39,15 +41,29 @@ export async function generateMetadata({ params }: PublicPostPageProps): Promise
   }
 
   const canonical = postUrl(post.id);
-  const title = `Post by ${post.authorDisplayName} on Cadesca`;
-  const description = metadataDescription(post.body);
+  const title = publicPostTitle(post.authorDisplayName, post.body);
+  const description = publicPostDescription(post.body);
   const images = post.imageUrl ? [{ url: post.imageUrl, alt: title }] : undefined;
 
   return {
     title,
     description,
     alternates: { canonical },
-    robots: { index: true, follow: true },
+    authors: [{
+      name: post.authorDisplayName,
+      url: post.authorProfileUrl
+    }],
+    robots: {
+      index: true,
+      follow: true,
+      googleBot: {
+        index: true,
+        follow: true,
+        "max-image-preview": "large",
+        "max-snippet": -1,
+        "max-video-preview": -1
+      }
+    },
     openGraph: {
       type: "article",
       url: canonical,
@@ -56,7 +72,7 @@ export async function generateMetadata({ params }: PublicPostPageProps): Promise
       siteName: "Cadesca",
       publishedTime: post.createdAt,
       modifiedTime: post.updatedAt,
-      authors: [post.authorDisplayName],
+      authors: [post.authorProfileUrl],
       images
     },
     twitter: {
@@ -75,33 +91,28 @@ export default async function PublicPostPage({ params }: PublicPostPageProps) {
   if (!post) notFound();
 
   const canonical = postUrl(post.id);
-  const structuredData = {
-    "@context": "https://schema.org",
-    "@type": "SocialMediaPosting",
-    headline: `Post by ${post.authorDisplayName} on Cadesca`,
-    articleBody: post.body || undefined,
-    datePublished: post.createdAt,
-    dateModified: post.updatedAt,
-    image: post.imageUrl || undefined,
-    mainEntityOfPage: canonical,
+  const structuredData = buildDiscussionForumPostingStructuredData({
+    canonicalUrl: canonical,
+    siteUrl: getPublicUrl(),
+    body: post.body,
+    imageUrl: post.imageUrl,
+    createdAt: post.createdAt,
+    updatedAt: post.updatedAt,
+    likeCount: post.likeCount,
+    commentCount: post.commentCount,
     author: {
-      "@type": "Person",
-      name: post.authorDisplayName,
-      url: post.authorUsername ? `${getPublicUrl()}/user/${encodeURIComponent(post.authorUsername)}` : undefined
-    },
-    publisher: {
-      "@type": "Organization",
-      name: "Cadesca",
-      url: getPublicUrl()
+      displayName: post.authorDisplayName,
+      username: post.authorUsername,
+      profileUrl: post.authorProfileUrl
     }
-  };
+  });
 
   return (
     <>
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{
-          __html: JSON.stringify(structuredData).replace(/</g, "\\u003c")
+          __html: serializeJsonLd(structuredData)
         }}
       />
       <PublicPostPreview

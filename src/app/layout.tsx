@@ -13,11 +13,34 @@ import {
 
 export const metadata: Metadata = {
   metadataBase: new URL(getPublicUrl()),
+  applicationName: "Cadesca",
   title: "Cadesca",
-  description: "A verified private university community for students.",
+  description: "A verified student community for campus conversations and university life.",
+  manifest: "/manifest.webmanifest",
   icons: {
-    icon: "/cadesca-mark.png"
-  }
+    icon: [
+      {
+        url: "/favicon-96x96.png",
+        type: "image/png",
+        sizes: "96x96"
+      },
+      {
+        url: "/cadesca-mark.svg",
+        type: "image/svg+xml",
+        sizes: "any"
+      }
+    ],
+    shortcut: "/favicon-96x96.png",
+    apple: "/cadesca-mark.png"
+  },
+  openGraph: {
+    siteName: "Cadesca"
+  },
+  verification: process.env.GOOGLE_SITE_VERIFICATION
+    ? {
+        google: process.env.GOOGLE_SITE_VERIFICATION
+      }
+    : undefined
 };
 
 export default async function RootLayout({

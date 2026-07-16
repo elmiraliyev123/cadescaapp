@@ -20,6 +20,7 @@ export type CurrentStudentContext = {
   displayName: string | null;
   bio: string | null;
   avatarUrl: string | null;
+  publicProfileEnabled: boolean;
   universityId: string | null;
   universityName: string | null;
   universitySlug: string | null;
@@ -185,6 +186,7 @@ type CurrentStudentRow = {
   display_name: string | null;
   bio: string | null;
   avatar_url: string | null;
+  public_profile_enabled: boolean;
   university_id: string | null;
   university_name: string | null;
   university_domain: string | null;
@@ -209,6 +211,7 @@ type LegacyCurrentStudentRow = Omit<
   | "display_name"
   | "bio"
   | "avatar_url"
+  | "public_profile_enabled"
 > & {
   university_id?: null;
   verified_at?: null;
@@ -219,6 +222,7 @@ type LegacyCurrentStudentRow = Omit<
   display_name?: null;
   bio?: null;
   avatar_url?: null;
+  public_profile_enabled?: true;
 };
 
 type PostRow = {
@@ -388,6 +392,7 @@ function mapCurrentStudent(row: CurrentStudentRow | LegacyCurrentStudentRow, soc
     displayName: row.display_name || row.name,
     bio: row.bio || null,
     avatarUrl: row.avatar_url || null,
+    publicProfileEnabled: row.public_profile_enabled !== false,
     universityId,
     universityName: resolvedUniversityName,
     universitySlug: row.university_slug || null,
@@ -442,6 +447,7 @@ export async function getCurrentStudentContext(): Promise<CurrentStudentContext 
       displayName: "Demo Student",
       bio: null,
       avatarUrl: null,
+      publicProfileEnabled: true,
       universityId: "demo_bilkent",
       universityName: "Bilkent University",
       universitySlug: "bilkent",
@@ -472,6 +478,7 @@ export async function getCurrentStudentContext(): Promise<CurrentStudentContext 
          app_user.display_name,
          app_user.bio,
          app_user.avatar_url,
+         app_user.public_profile_enabled,
          app_user.university_id,
          app_user.university_name,
          app_user.university_domain,
@@ -511,6 +518,7 @@ export async function getCurrentStudentContext(): Promise<CurrentStudentContext 
          null::text as display_name,
          null::text as bio,
          null::text as avatar_url,
+         true::boolean as public_profile_enabled,
          app_user.university_name,
          app_user.university_domain,
          app_user.student_status,
@@ -1055,6 +1063,7 @@ export async function updateCurrentUserProfile(input: {
   username: string;
   bio?: string | null;
   avatarPath?: string | null;
+  publicProfileEnabled: boolean;
 }) {
   const user = await getCurrentStudentContext();
   requireActiveUser(user);
@@ -1082,9 +1091,17 @@ export async function updateCurrentUserProfile(input: {
            username = $2,
            bio = $3,
            avatar_url = coalesce($4, avatar_url),
+           public_profile_enabled = $5,
            updated_at = now()
-       where id = $5`,
-      [displayName, username, bio, input.avatarPath || null, user.id]
+       where id = $6`,
+      [
+        displayName,
+        username,
+        bio,
+        input.avatarPath || null,
+        input.publicProfileEnabled,
+        user.id
+      ]
     );
   } catch (error) {
     if (getPgCode(error) === "23505") throw new Error("username_taken");

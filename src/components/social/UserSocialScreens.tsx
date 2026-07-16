@@ -1081,6 +1081,23 @@ export function ProfileSettingsScreen({ user }: { user: CurrentStudentContext | 
                 />
               </label>
 
+              <label className="flex items-start gap-3 rounded-xl border border-outline-variant/30 bg-surface-container-low p-4">
+                <input
+                  name="publicProfileEnabled"
+                  type="checkbox"
+                  defaultChecked={user.publicProfileEnabled}
+                  className="mt-0.5 h-5 w-5 shrink-0 accent-primary"
+                />
+                <span className="min-w-0">
+                  <span className="block text-label-md font-semibold text-primary">
+                    {t("social.publicProfileEnabled")}
+                  </span>
+                  <span className="mt-1 block text-[13px] font-normal leading-5 text-secondary">
+                    {t("social.publicProfileDescription")}
+                  </span>
+                </span>
+              </label>
+
               <div className="flex flex-wrap items-center justify-between gap-3 border-t border-outline-variant/20 pt-4">
                 {formMessage ? (
                   <p className={cn("text-caption font-semibold", state.ok ? "text-primary" : "text-error")} role="status">
@@ -1217,7 +1234,7 @@ export function ProfileScreen({
 
   async function shareProfile() {
     if (!user?.username) return;
-    const url = `${window.location.origin}/user/${user.username}`;
+    const url = `${publicUrl}/user/${user.username}`;
     try {
       if (navigator.share) await navigator.share({ title: profileName, url });
       else await navigator.clipboard.writeText(url);

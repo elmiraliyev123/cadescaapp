@@ -69,12 +69,14 @@ export async function updateProfileSettingsAction(
   const displayName = String(formData.get("displayName") || "");
   const username = String(formData.get("username") || "");
   const bio = String(formData.get("bio") || "");
+  const publicProfileEnabled = formData.get("publicProfileEnabled") === "on";
 
   logProfileAction("update_profile_settings", "start", {
     hasAvatar: Boolean(avatar),
     displayNameLength: displayName.length,
     hasUsername: Boolean(username),
-    bioLength: bio.length
+    bioLength: bio.length,
+    publicProfileEnabled
   });
 
   try {
@@ -84,7 +86,8 @@ export async function updateProfileSettingsAction(
       displayName,
       username,
       bio,
-      avatarPath
+      avatarPath,
+      publicProfileEnabled
     });
 
     const normalizedUsername = username.trim().toLowerCase();

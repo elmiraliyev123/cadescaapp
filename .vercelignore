@@ -2,6 +2,8 @@
 node_modules
 .git
 .vercel
+artifacts
+output
 .env*
 !.env.example
 *.log

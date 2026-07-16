@@ -1,10 +1,14 @@
 "use client";
 
+import Image from "next/image";
+import Link from "next/link";
 import { useState } from "react";
 
 import { AppTopBar } from "@/components/app/AppTopBar";
+import { PublicGuestBanner } from "@/components/public/PublicGuestBanner";
 import { UserAvatar, VerifiedBadge } from "@/components/social/SocialPrimitives";
 import { useLanguage, type Language } from "@/lib/i18n";
+import { hostRelativePublicAssetUrl } from "@/lib/publicAssetUrl";
 import type { PublicPostPreview as PublicPostPreviewData } from "@/lib/server/publicPosts";
 
 const DATE_LOCALES: Record<Language, string> = {
@@ -21,49 +25,6 @@ function formatPostDate(value: string, language: Language) {
   }).format(new Date(value));
 }
 
-function JoinCadescaBanner({
-  signupHref,
-  loginHref
-}: {
-  signupHref: string;
-  loginHref: string;
-}) {
-  const { t } = useLanguage();
-
-  return (
-    <aside
-      aria-labelledby="join-cadesca-title"
-      className="public-maple-banner fixed inset-x-0 bottom-0 z-50 w-full border-t border-white/30 px-4 pb-[calc(12px+env(safe-area-inset-bottom))] pt-3 shadow-[0_-8px_32px_rgba(62,31,20,0.22)] sm:px-6 sm:py-4"
-    >
-      <div className="relative z-10 mx-auto flex w-full max-w-[960px] flex-col gap-3 sm:flex-row sm:items-center sm:justify-between sm:gap-6">
-        <div className="min-w-0">
-          <h2 id="join-cadesca-title" className="text-[18px] font-semibold leading-6 text-white sm:text-[20px]">
-            {t("social.publicJoinTitle")}
-          </h2>
-          <p className="mt-0.5 max-w-[500px] text-[13px] font-normal leading-5 text-white/85">
-            {t("social.publicJoinDescription")}
-          </p>
-        </div>
-
-        <div className="grid shrink-0 grid-cols-2 gap-2 sm:flex sm:w-auto">
-          <a
-            href={signupHref}
-            className="inline-flex min-h-11 min-w-[112px] items-center justify-center rounded-xl border border-black bg-black px-5 text-[15px] font-semibold text-white transition-transform duration-200 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white active:scale-[0.98]"
-          >
-            {t("social.publicSignUp")}
-          </a>
-          <a
-            href={loginHref}
-            className="inline-flex min-h-11 min-w-[112px] items-center justify-center rounded-xl border border-black/35 bg-white/95 px-5 text-[15px] font-semibold text-black transition-transform duration-200 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white active:scale-[0.98]"
-          >
-            {t("social.publicLogIn")}
-          </a>
-        </div>
-      </div>
-    </aside>
-  );
-}
-
 export function PublicPostPreview({
   post,
   shareUrl,
@@ -77,6 +38,8 @@ export function PublicPostPreview({
 }) {
   const { language, t } = useLanguage();
   const [shareStatus, setShareStatus] = useState("");
+  const authorAvatarUrl = hostRelativePublicAssetUrl(post.authorAvatarUrl);
+  const imageUrl = hostRelativePublicAssetUrl(post.imageUrl);
 
   async function sharePost() {
     try {
@@ -99,22 +62,30 @@ export function PublicPostPreview({
         <article className="overflow-hidden border-y border-black/10 bg-white sm:rounded-2xl sm:border">
           <div className="p-4 sm:p-6">
             <div className="flex items-start gap-3">
-              <UserAvatar
-                name={post.authorDisplayName}
-                src={post.authorAvatarUrl}
-                size="md"
-                inverse
-              />
+              <Link
+                href={post.authorProfileUrl}
+                aria-label={`@${post.authorUsername}`}
+                className="rounded-full focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-black"
+              >
+                <UserAvatar
+                  name={post.authorDisplayName}
+                  src={authorAvatarUrl}
+                  size="md"
+                  inverse
+                />
+              </Link>
 
               <div className="min-w-0 flex-1">
                 <div className="flex min-w-0 items-center">
                   <h1 className="min-w-0 truncate text-[16px] font-semibold leading-6">
-                    {post.authorDisplayName}
+                    <Link href={post.authorProfileUrl} className="hover:underline">
+                      {post.authorDisplayName}
+                    </Link>
                   </h1>
                   <VerifiedBadge className="[--verified-tooltip-bottom:168px]" />
                 </div>
                 <p className="truncate text-[13px] font-normal leading-5 text-black/55">
-                  {post.authorUsername ? `@${post.authorUsername} · ` : ""}
+                  @{post.authorUsername} ·{" "}
                   {post.universityName}
                 </p>
               </div>
@@ -126,13 +97,14 @@ export function PublicPostPreview({
               </p>
             ) : null}
 
-            {post.imageUrl ? (
+            {imageUrl ? (
               <div className="mt-4 overflow-hidden rounded-2xl border border-black/10 bg-[#f1f1f1]">
-                <img
-                  src={post.imageUrl}
+                <Image
+                  src={imageUrl}
                   alt={t("social.publicPhotoAlt").replace("{name}", post.authorDisplayName)}
                   width={1200}
                   height={1200}
+                  unoptimized
                   className="max-h-[620px] w-full object-contain"
                 />
               </div>
@@ -167,7 +139,7 @@ export function PublicPostPreview({
         </article>
       </main>
 
-      <JoinCadescaBanner signupHref={signupHref} loginHref={loginHref} />
+      <PublicGuestBanner signupHref={signupHref} loginHref={loginHref} />
     </div>
   );
 }

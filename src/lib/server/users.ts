@@ -24,6 +24,7 @@ export type User = {
   display_name: string | null;
   bio: string | null;
   avatar_url: string | null;
+  public_profile_enabled: boolean;
   verified_via: string;
   verified_at: Date | null;
   student_id_image_path: string | null;
@@ -77,6 +78,7 @@ async function ensureUserSchema(clientOrPool: Pool | PoolClient) {
       student_menu_access boolean NOT NULL DEFAULT false,
       email_verified boolean NOT NULL DEFAULT false,
       locale text,
+      public_profile_enabled boolean NOT NULL DEFAULT true,
       verified_via text NOT NULL DEFAULT 'email',
       student_id_image_path text,
       student_number text,
@@ -148,6 +150,7 @@ async function ensureUserSchema(clientOrPool: Pool | PoolClient) {
     ALTER TABLE public.users ADD COLUMN IF NOT EXISTS display_name text;
     ALTER TABLE public.users ADD COLUMN IF NOT EXISTS bio text;
     ALTER TABLE public.users ADD COLUMN IF NOT EXISTS avatar_url text;
+    ALTER TABLE public.users ADD COLUMN IF NOT EXISTS public_profile_enabled boolean NOT NULL DEFAULT true;
     ALTER TABLE public.users ADD COLUMN IF NOT EXISTS verified_via text NOT NULL DEFAULT 'email';
     ALTER TABLE public.users ADD COLUMN IF NOT EXISTS verified_at timestamptz;
     ALTER TABLE public.users ADD COLUMN IF NOT EXISTS student_id_image_path text;
@@ -167,6 +170,7 @@ async function ensureUserSchema(clientOrPool: Pool | PoolClient) {
         student_status = COALESCE(NULLIF(student_status, ''), 'not_verified'),
         student_menu_access = COALESCE(student_menu_access, false),
         email_verified = COALESCE(email_verified, false),
+        public_profile_enabled = COALESCE(public_profile_enabled, true),
         verified_via = COALESCE(NULLIF(verified_via, ''), 'email');
 
     ALTER TABLE public.users ALTER COLUMN role SET DEFAULT 'user';
@@ -174,6 +178,7 @@ async function ensureUserSchema(clientOrPool: Pool | PoolClient) {
     ALTER TABLE public.users ALTER COLUMN student_status SET DEFAULT 'not_verified';
     ALTER TABLE public.users ALTER COLUMN student_menu_access SET DEFAULT false;
     ALTER TABLE public.users ALTER COLUMN email_verified SET DEFAULT false;
+    ALTER TABLE public.users ALTER COLUMN public_profile_enabled SET DEFAULT true;
     ALTER TABLE public.users ALTER COLUMN verified_via SET DEFAULT 'email';
     ALTER TABLE public.users ALTER COLUMN created_at SET DEFAULT now();
     ALTER TABLE public.users ALTER COLUMN updated_at SET DEFAULT now();
@@ -188,6 +193,15 @@ async function ensureUserSchema(clientOrPool: Pool | PoolClient) {
 
     CREATE INDEX IF NOT EXISTS users_university_id_idx
       ON public.users (university_id);
+
+    CREATE INDEX IF NOT EXISTS users_public_profile_search_idx
+      ON public.users (lower(username), updated_at DESC)
+      WHERE role = 'user'
+        AND status = 'active'
+        AND student_status = 'verified'
+        AND public_profile_enabled = true
+        AND suspended_at IS NULL
+        AND deleted_at IS NULL;
   `);
 }
 

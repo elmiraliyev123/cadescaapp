@@ -75,6 +75,14 @@ function isPublicPostPath(pathname: string) {
   return pathname === "/post" || pathname.startsWith("/post/");
 }
 
+function isPublicProfilePath(pathname: string) {
+  return pathname === "/user" || pathname.startsWith("/user/");
+}
+
+function isPublicMediaPath(pathname: string) {
+  return pathname === "/media" || pathname.startsWith("/media/");
+}
+
 function isNavigationMethod(method: string) {
   return method === "GET" || method === "HEAD";
 }
@@ -388,13 +396,38 @@ export async function middleware(request: NextRequest) {
 
   const localeResolution = resolveLocale(request);
   const passThroughReason = appRequestPassThroughReason(request);
+  const authenticatedAppHost =
+    host === "app.cadesca.com" ||
+    host === "cadesca-app.vercel.app";
+  const nonCanonicalPortalHost =
+    host === "auth.cadesca.com" ||
+    host === "merchant.cadesca.com" ||
+    host === "adminlog.cadesca.com";
 
-  if (isPublicPostPath(pathname)) {
+  if (isPublicProfilePath(pathname)) {
+    if (nonCanonicalPortalHost) {
+      const target = new URL(`${pathname}${request.nextUrl.search}`, publicSiteOrigin(request));
+      return finalizeResponse(
+        request,
+        applyLocaleToResponse(redirectAbsolute(target.toString()), localeResolution)
+      );
+    }
+
+    if (authenticatedAppHost && !(await hasStudentSession(request))) {
+      const target = new URL(`${pathname}${request.nextUrl.search}`, publicSiteOrigin(request));
+      return finalizeResponse(
+        request,
+        applyLocaleToResponse(redirectAbsolute(target.toString()), localeResolution)
+      );
+    }
+
+    return finalizeResponse(request, localizedNextResponse(request, localeResolution));
+  }
+
+  if (isPublicPostPath(pathname) || isPublicMediaPath(pathname)) {
     const shouldUseCanonicalHost =
-      host === "app.cadesca.com" ||
-      host === "auth.cadesca.com" ||
-      host === "merchant.cadesca.com" ||
-      host === "adminlog.cadesca.com";
+      authenticatedAppHost ||
+      nonCanonicalPortalHost;
 
     if (shouldUseCanonicalHost) {
       const target = new URL(`${pathname}${request.nextUrl.search}`, publicSiteOrigin(request));
