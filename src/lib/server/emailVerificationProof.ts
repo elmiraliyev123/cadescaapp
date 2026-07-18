@@ -44,7 +44,10 @@ function parsePayload(encodedPayload: string): EmailVerificationProofPayload | n
     const parsed = JSON.parse(base64UrlDecode(encodedPayload)) as Partial<EmailVerificationProofPayload>;
     if (
       typeof parsed.email !== "string" ||
-      (parsed.purpose !== "signup" && parsed.purpose !== "login" && parsed.purpose !== "password_reset") ||
+      (parsed.purpose !== "signup" &&
+        parsed.purpose !== "login" &&
+        parsed.purpose !== "password_reset" &&
+        parsed.purpose !== "club_application") ||
       typeof parsed.verificationId !== "string" ||
       typeof parsed.nonce !== "string" ||
       typeof parsed.issuedAt !== "number" ||

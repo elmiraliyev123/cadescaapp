@@ -21,6 +21,7 @@ export const roleNavItems: Record<DemoRole, NavItem[]> = {
     { label: "Home", href: "/app/user/home", icon: "home", i18nKey: "common.home" },
     { label: "Explore", href: "/app/user/explore", icon: "search", i18nKey: "common.explore" },
     { label: "Create", href: "/app/user/create", icon: "add_box", i18nKey: "common.create" },
+    { label: "Club", href: "/app/user/club", icon: "groups", i18nKey: "common.club" },
     { label: "Notifications", href: "/app/user/activity", icon: "notifications", i18nKey: "social.activityTitle" },
     { label: "Profile", href: "/app/user/profile", icon: "person", i18nKey: "common.profile" }
   ],
@@ -51,6 +52,7 @@ export const roleNavItems: Record<DemoRole, NavItem[]> = {
     { label: "Wallet Passes", href: "/app/admin/wallet-passes", icon: "wallet", i18nKey: "admin.walletPasses" },
     { label: "Social", href: "/app/admin/social", icon: "forum", i18nKey: "admin.social" },
     { label: "Feed Moderation", href: "/app/admin/feed-moderation", icon: "shield_person", i18nKey: "admin.feedModeration" },
+    { label: "Events", href: "/app/admin/events", icon: "event", i18nKey: "admin.events" },
     { label: "Merchant Accounts", href: "/app/admin/merchants", icon: "storefront", i18nKey: "admin.merchantAccounts" },
     { label: "Activity", href: "/app/admin/activity", icon: "receipt_long", i18nKey: "common.activity" },
     { label: "Approvals", href: "/app/admin/approvals", icon: "fact_check", i18nKey: "admin.approvals" },

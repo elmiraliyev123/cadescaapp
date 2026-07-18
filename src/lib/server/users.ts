@@ -4,6 +4,7 @@ import { randomBytes } from "node:crypto";
 import { Pool, type PoolClient } from "pg";
 import { hashMerchantPassword, verifyMerchantPassword, MerchantDbError } from "./merchants";
 import { isSupportedLocale, type SupportedLocale } from "../localization";
+import { isValidCadescaUsername, validateCadescaUsername } from "../usernames";
 
 export type User = {
   id: string;
@@ -191,6 +192,10 @@ async function ensureUserSchema(clientOrPool: Pool | PoolClient) {
       ON public.users (username)
       WHERE username IS NOT NULL;
 
+    CREATE UNIQUE INDEX IF NOT EXISTS users_username_lower_key
+      ON public.users (lower(username))
+      WHERE username IS NOT NULL;
+
     CREATE INDEX IF NOT EXISTS users_university_id_idx
       ON public.users (university_id);
 
@@ -256,26 +261,7 @@ function normalizeVerifiedVia(value: CreateUserInput["verifiedVia"]) {
   return value === "ocr" ? "ocr" : "email";
 }
 
-const RESERVED_USERNAMES = new Set([
-  "admin",
-  "administrator",
-  "api",
-  "app",
-  "auth",
-  "cadesca",
-  "help",
-  "login",
-  "logout",
-  "merchant",
-  "moderator",
-  "root",
-  "settings",
-  "signup",
-  "support",
-  "system"
-]);
-
-function normalizeUsernameCandidate(value: string) {
+function normalizeUsernameSeed(value: string) {
   return value
     .trim()
     .toLowerCase()
@@ -286,16 +272,6 @@ function normalizeUsernameCandidate(value: string) {
     .replace(/\.+/g, ".")
     .replace(/^\.+|\.+$/g, "")
     .slice(0, 30);
-}
-
-function isAllowedUsername(value: string) {
-  return (
-    /^[a-z0-9_.]{3,30}$/.test(value) &&
-    !value.startsWith(".") &&
-    !value.endsWith(".") &&
-    !value.includes("..") &&
-    !RESERVED_USERNAMES.has(value)
-  );
 }
 
 async function usernameExists(pool: Pool, username: string) {
@@ -312,23 +288,22 @@ async function usernameExists(pool: Pool, username: string) {
 
 async function resolveSignupUsername(pool: Pool, input: CreateUserInput, email: string) {
   if (input.username?.trim()) {
-    const requested = normalizeUsernameCandidate(input.username);
-    if (!isAllowedUsername(requested)) throw new Error("invalid_username");
+    const requested = validateCadescaUsername(input.username);
     if (await usernameExists(pool, requested)) throw new Error("duplicate_username");
     return requested;
   }
 
   const emailLocalPart = email.split("@")[0] || "student";
   const base =
-    normalizeUsernameCandidate(input.displayName || input.name || emailLocalPart) ||
-    normalizeUsernameCandidate(emailLocalPart) ||
+    normalizeUsernameSeed(input.displayName || input.name || emailLocalPart) ||
+    normalizeUsernameSeed(emailLocalPart) ||
     "student";
-  const safeBase = isAllowedUsername(base) ? base : `student.${randomBytes(2).toString("hex")}`;
+  const safeBase = isValidCadescaUsername(base) ? base : `student.${randomBytes(2).toString("hex")}`;
 
   for (let index = 0; index < 25; index += 1) {
     const suffix = index === 0 ? "" : `.${index + 1}`;
     const candidate = `${safeBase.slice(0, 30 - suffix.length)}${suffix}`;
-    if (isAllowedUsername(candidate) && !(await usernameExists(pool, candidate))) {
+    if (isValidCadescaUsername(candidate) && !(await usernameExists(pool, candidate))) {
       return candidate;
     }
   }
@@ -336,7 +311,7 @@ async function resolveSignupUsername(pool: Pool, input: CreateUserInput, email: 
   for (let index = 0; index < 10; index += 1) {
     const suffix = `.${randomBytes(3).toString("hex")}`;
     const candidate = `${safeBase.slice(0, 30 - suffix.length)}${suffix}`;
-    if (isAllowedUsername(candidate) && !(await usernameExists(pool, candidate))) {
+    if (isValidCadescaUsername(candidate) && !(await usernameExists(pool, candidate))) {
       return candidate;
     }
   }

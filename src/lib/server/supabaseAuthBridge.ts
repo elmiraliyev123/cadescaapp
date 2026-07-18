@@ -1,8 +1,12 @@
 import "server-only";
 
+import { createClient } from "@supabase/supabase-js";
+import { cookies } from "next/headers";
 import type { NextResponse } from "next/server";
 
+import { withSharedCookieDomain } from "@/lib/cookieDomain";
 import { getSupabaseAdminClient } from "@/lib/supabase/admin";
+import { requireSupabasePublicEnv } from "@/lib/supabase/env";
 import { createSupabaseRouteHandlerClient } from "@/lib/supabase/route";
 import { getReadyPool } from "@/lib/server/users";
 
@@ -31,6 +35,22 @@ function normalizeEmail(email: string) {
 
 function authErrorLooksDuplicate(message: string) {
   return /already|duplicate|registered|exists/i.test(message);
+}
+
+export async function authenticateSupabaseAuthIdentity(input: { email: string; password: string }) {
+  const { url, publishableKey } = requireSupabasePublicEnv();
+  const client = createClient(url, publishableKey, {
+    auth: {
+      autoRefreshToken: false,
+      detectSessionInUrl: false,
+      persistSession: false
+    }
+  });
+  const { data, error } = await client.auth.signInWithPassword({
+    email: normalizeEmail(input.email),
+    password: input.password
+  });
+  return error || !data.user?.id ? null : data.user;
 }
 
 export async function createConfirmedSupabaseAuthUser(input: {
@@ -132,6 +152,24 @@ export async function signInSupabaseAuthOnResponse(input: {
   console.error("[supabase_auth_bridge] sign_in_failed", {
     email: normalizeEmail(input.email),
     message: errorMessage
+  });
+
+  // Never leave a stale Supabase identity alongside a newly issued legacy
+  // session. Mixed cookies must fail closed instead of selecting either user.
+  const cookieStore = await cookies();
+  const authCookieNames = new Set([
+    ...cookieStore.getAll().map((cookie) => cookie.name),
+    ...input.response.cookies.getAll().map((cookie) => cookie.name)
+  ].filter((name) => name.startsWith("sb-") && name.includes("auth-token")));
+  authCookieNames.forEach((name) => {
+      input.response.cookies.set(name, "", withSharedCookieDomain({
+        httpOnly: true,
+        secure: process.env.NODE_ENV === "production",
+        sameSite: "lax",
+        maxAge: 0,
+        expires: new Date(0),
+        path: "/"
+      }));
   });
 
   throw new SupabaseAuthBridgeError("supabase_auth_sign_in_failed", 502);

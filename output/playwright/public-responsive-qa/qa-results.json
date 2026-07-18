@@ -1,0 +1,564 @@
+{
+  "mobile": [
+    {
+      "width": 320,
+      "clientWidth": 320,
+      "scrollWidth": 320,
+      "headerHeight": 112,
+      "logoWidth": 196,
+      "logoHeight": 79,
+      "logoCenterOffset": 0,
+      "logoNaturalRatio": 2.480769230769231,
+      "logoRenderedRatio": 2.481012658227848,
+      "logoObjectFit": "contain",
+      "logoContained": true,
+      "mainPaddingTop": 128,
+      "navHeight": 83,
+      "createWidth": 60,
+      "createHeight": 60,
+      "createRadius": "9999px",
+      "notificationTextOverflow": "clip",
+      "notificationOverflow": 0,
+      "notificationLines": 2
+    },
+    {
+      "width": 375,
+      "clientWidth": 375,
+      "scrollWidth": 375,
+      "headerHeight": 112,
+      "logoWidth": 196,
+      "logoHeight": 79,
+      "logoCenterOffset": 0,
+      "logoNaturalRatio": 2.480769230769231,
+      "logoRenderedRatio": 2.481012658227848,
+      "logoObjectFit": "contain",
+      "logoContained": true,
+      "mainPaddingTop": 128,
+      "navHeight": 83,
+      "createWidth": 60,
+      "createHeight": 60,
+      "createRadius": "9999px",
+      "notificationTextOverflow": "clip",
+      "notificationOverflow": 0,
+      "notificationLines": 2
+    },
+    {
+      "width": 390,
+      "clientWidth": 390,
+      "scrollWidth": 390,
+      "headerHeight": 112,
+      "logoWidth": 196,
+      "logoHeight": 79,
+      "logoCenterOffset": 0,
+      "logoNaturalRatio": 2.480769230769231,
+      "logoRenderedRatio": 2.481012658227848,
+      "logoObjectFit": "contain",
+      "logoContained": true,
+      "mainPaddingTop": 128,
+      "navHeight": 83,
+      "createWidth": 60,
+      "createHeight": 60,
+      "createRadius": "9999px",
+      "notificationTextOverflow": "clip",
+      "notificationOverflow": 0,
+      "notificationLines": 1
+    },
+    {
+      "width": 430,
+      "clientWidth": 430,
+      "scrollWidth": 430,
+      "headerHeight": 112,
+      "logoWidth": 196,
+      "logoHeight": 79,
+      "logoCenterOffset": 0,
+      "logoNaturalRatio": 2.480769230769231,
+      "logoRenderedRatio": 2.481012658227848,
+      "logoObjectFit": "contain",
+      "logoContained": true,
+      "mainPaddingTop": 128,
+      "navHeight": 83,
+      "createWidth": 60,
+      "createHeight": 60,
+      "createRadius": "9999px",
+      "notificationTextOverflow": "clip",
+      "notificationOverflow": 0,
+      "notificationLines": 1
+    }
+  ],
+  "languages": [
+    {
+      "locale": "en",
+      "layout": {
+        "actions": [
+          {
+            "text": "Edit profile",
+            "width": 288,
+            "height": 44,
+            "overflow": 0,
+            "marginLeft": 0,
+            "marginRight": 0
+          },
+          {
+            "text": "Share profile",
+            "width": 288,
+            "height": 44,
+            "overflow": 0,
+            "marginLeft": 0,
+            "marginRight": 0
+          },
+          {
+            "text": "Student card",
+            "width": 288,
+            "height": 44,
+            "overflow": 0,
+            "marginLeft": 0,
+            "marginRight": 0
+          }
+        ],
+        "tabs": [
+          {
+            "text": "Posts",
+            "overflow": 0,
+            "textOverflow": "clip",
+            "height": 48
+          },
+          {
+            "text": "Student card",
+            "overflow": 0,
+            "textOverflow": "clip",
+            "height": 48
+          }
+        ],
+        "clientWidth": 320,
+        "scrollWidth": 320
+      },
+      "nav": {
+        "clientWidth": 320,
+        "scrollWidth": 320,
+        "headerHeight": 112,
+        "logoWidth": 196,
+        "logoHeight": 79,
+        "logoCenterOffset": 0,
+        "logoNaturalRatio": 2.480769230769231,
+        "logoRenderedRatio": 2.481012658227848,
+        "logoObjectFit": "contain",
+        "logoContained": true,
+        "mainPaddingTop": 128,
+        "navHeight": 83,
+        "createWidth": 60,
+        "createHeight": 60,
+        "createRadius": "9999px",
+        "notificationTextOverflow": "clip",
+        "notificationOverflow": 0,
+        "notificationLines": 2
+      }
+    },
+    {
+      "locale": "az",
+      "layout": {
+        "actions": [
+          {
+            "text": "Profili redaktə et",
+            "width": 288,
+            "height": 44,
+            "overflow": 0,
+            "marginLeft": 0,
+            "marginRight": 0
+          },
+          {
+            "text": "Profili paylaş",
+            "width": 288,
+            "height": 44,
+            "overflow": 0,
+            "marginLeft": 0,
+            "marginRight": 0
+          },
+          {
+            "text": "Tələbə kartı",
+            "width": 288,
+            "height": 44,
+            "overflow": 0,
+            "marginLeft": 0,
+            "marginRight": 0
+          }
+        ],
+        "tabs": [
+          {
+            "text": "Postlar",
+            "overflow": 0,
+            "textOverflow": "clip",
+            "height": 48
+          },
+          {
+            "text": "Tələbə kartı",
+            "overflow": 0,
+            "textOverflow": "clip",
+            "height": 48
+          }
+        ],
+        "clientWidth": 320,
+        "scrollWidth": 320
+      },
+      "nav": {
+        "clientWidth": 320,
+        "scrollWidth": 320,
+        "headerHeight": 112,
+        "logoWidth": 196,
+        "logoHeight": 79,
+        "logoCenterOffset": 0,
+        "logoNaturalRatio": 2.480769230769231,
+        "logoRenderedRatio": 2.481012658227848,
+        "logoObjectFit": "contain",
+        "logoContained": true,
+        "mainPaddingTop": 128,
+        "navHeight": 83,
+        "createWidth": 60,
+        "createHeight": 60,
+        "createRadius": "9999px",
+        "notificationTextOverflow": "clip",
+        "notificationOverflow": 0,
+        "notificationLines": 1
+      }
+    },
+    {
+      "locale": "tr",
+      "layout": {
+        "actions": [
+          {
+            "text": "Profili düzenle",
+            "width": 288,
+            "height": 44,
+            "overflow": 0,
+            "marginLeft": 0,
+            "marginRight": 0
+          },
+          {
+            "text": "Profili paylaş",
+            "width": 288,
+            "height": 44,
+            "overflow": 0,
+            "marginLeft": 0,
+            "marginRight": 0
+          },
+          {
+            "text": "Öğrenci kartı",
+            "width": 288,
+            "height": 44,
+            "overflow": 0,
+            "marginLeft": 0,
+            "marginRight": 0
+          }
+        ],
+        "tabs": [
+          {
+            "text": "Gönderiler",
+            "overflow": 0,
+            "textOverflow": "clip",
+            "height": 48
+          },
+          {
+            "text": "Öğrenci kartı",
+            "overflow": 0,
+            "textOverflow": "clip",
+            "height": 48
+          }
+        ],
+        "clientWidth": 320,
+        "scrollWidth": 320
+      },
+      "nav": {
+        "clientWidth": 320,
+        "scrollWidth": 320,
+        "headerHeight": 112,
+        "logoWidth": 196,
+        "logoHeight": 79,
+        "logoCenterOffset": 0,
+        "logoNaturalRatio": 2.480769230769231,
+        "logoRenderedRatio": 2.481012658227848,
+        "logoObjectFit": "contain",
+        "logoContained": true,
+        "mainPaddingTop": 128,
+        "navHeight": 83,
+        "createWidth": 60,
+        "createHeight": 60,
+        "createRadius": "9999px",
+        "notificationTextOverflow": "clip",
+        "notificationOverflow": 0,
+        "notificationLines": 1
+      }
+    },
+    {
+      "locale": "ru",
+      "layout": {
+        "actions": [
+          {
+            "text": "Редактировать профиль",
+            "width": 288,
+            "height": 44,
+            "overflow": 0,
+            "marginLeft": 0,
+            "marginRight": 0
+          },
+          {
+            "text": "Поделиться профилем",
+            "width": 288,
+            "height": 44,
+            "overflow": 0,
+            "marginLeft": 0,
+            "marginRight": 0
+          },
+          {
+            "text": "Студенческая карта",
+            "width": 288,
+            "height": 44,
+            "overflow": 0,
+            "marginLeft": 0,
+            "marginRight": 0
+          }
+        ],
+        "tabs": [
+          {
+            "text": "Посты",
+            "overflow": 0,
+            "textOverflow": "clip",
+            "height": 50
+          },
+          {
+            "text": "Студенческая карта",
+            "overflow": 0,
+            "textOverflow": "clip",
+            "height": 50
+          }
+        ],
+        "clientWidth": 320,
+        "scrollWidth": 320
+      },
+      "nav": {
+        "clientWidth": 320,
+        "scrollWidth": 320,
+        "headerHeight": 112,
+        "logoWidth": 196,
+        "logoHeight": 79,
+        "logoCenterOffset": 0,
+        "logoNaturalRatio": 2.480769230769231,
+        "logoRenderedRatio": 2.481012658227848,
+        "logoObjectFit": "contain",
+        "logoContained": true,
+        "mainPaddingTop": 128,
+        "navHeight": 83,
+        "createWidth": 60,
+        "createHeight": 60,
+        "createRadius": "9999px",
+        "notificationTextOverflow": "clip",
+        "notificationOverflow": 0,
+        "notificationLines": 2
+      }
+    }
+  ],
+  "explore": [
+    {
+      "width": 320,
+      "cards": [
+        {
+          "width": 260,
+          "height": 163,
+          "titleOverflow": "clip"
+        },
+        {
+          "width": 260,
+          "height": 163,
+          "titleOverflow": "clip"
+        },
+        {
+          "width": 260,
+          "height": 163,
+          "titleOverflow": "clip"
+        },
+        {
+          "width": 260,
+          "height": 163,
+          "titleOverflow": "clip"
+        }
+      ],
+      "carousel": {
+        "clientWidth": 320,
+        "scrollWidth": 1124,
+        "scrollPaddingLeft": "16px"
+      }
+    },
+    {
+      "width": 375,
+      "cards": [
+        {
+          "width": 285,
+          "height": 178,
+          "titleOverflow": "clip"
+        },
+        {
+          "width": 285,
+          "height": 178,
+          "titleOverflow": "clip"
+        },
+        {
+          "width": 285,
+          "height": 178,
+          "titleOverflow": "clip"
+        },
+        {
+          "width": 285,
+          "height": 178,
+          "titleOverflow": "clip"
+        }
+      ],
+      "carousel": {
+        "clientWidth": 375,
+        "scrollWidth": 1224,
+        "scrollPaddingLeft": "16px"
+      }
+    },
+    {
+      "width": 390,
+      "cards": [
+        {
+          "width": 290,
+          "height": 181,
+          "titleOverflow": "clip"
+        },
+        {
+          "width": 290,
+          "height": 181,
+          "titleOverflow": "clip"
+        },
+        {
+          "width": 290,
+          "height": 181,
+          "titleOverflow": "clip"
+        },
+        {
+          "width": 290,
+          "height": 181,
+          "titleOverflow": "clip"
+        }
+      ],
+      "carousel": {
+        "clientWidth": 390,
+        "scrollWidth": 1244,
+        "scrollPaddingLeft": "16px"
+      }
+    },
+    {
+      "width": 430,
+      "cards": [
+        {
+          "width": 290,
+          "height": 181,
+          "titleOverflow": "clip"
+        },
+        {
+          "width": 290,
+          "height": 181,
+          "titleOverflow": "clip"
+        },
+        {
+          "width": 290,
+          "height": 181,
+          "titleOverflow": "clip"
+        },
+        {
+          "width": 290,
+          "height": 181,
+          "titleOverflow": "clip"
+        }
+      ],
+      "carousel": {
+        "clientWidth": 430,
+        "scrollWidth": 1244,
+        "scrollPaddingLeft": "16px"
+      }
+    }
+  ],
+  "studentPass": {
+    "body": "Tələbə kartı\nDS\n\nDemo Student\n\nverified\n\nBilkent University\n\nCADESCA\n\n@demo.student\n\nqr_code_2\nqr_code_2\nQR göstər"
+  },
+  "publicPost": [
+    {
+      "width": 320,
+      "clientWidth": 320,
+      "scrollWidth": 320,
+      "bannerPosition": "fixed",
+      "bannerBottom": "0px",
+      "bannerBackground": "linear-gradient(120deg, rgb(122, 70, 50) 0%, rgb(157, 96, 67) 24%, rgb(190, 128, 89) 48%, rgb(217, 164, 119) 72%, rgb(240, 209, 172) 100%)",
+      "logoWidth": 148,
+      "logoHeight": 59.65625,
+      "studentNavCount": 0,
+      "composerCount": 0,
+      "canonical": "https://cadesca.com/post/00000000-0000-4000-8000-000000000099",
+      "structuredDataCount": 1
+    },
+    {
+      "width": 390,
+      "clientWidth": 390,
+      "scrollWidth": 390,
+      "bannerPosition": "fixed",
+      "bannerBottom": "0px",
+      "bannerBackground": "linear-gradient(120deg, rgb(122, 70, 50) 0%, rgb(157, 96, 67) 24%, rgb(190, 128, 89) 48%, rgb(217, 164, 119) 72%, rgb(240, 209, 172) 100%)",
+      "logoWidth": 148,
+      "logoHeight": 59.65625,
+      "studentNavCount": 0,
+      "composerCount": 0,
+      "canonical": "https://cadesca.com/post/00000000-0000-4000-8000-000000000099",
+      "structuredDataCount": 1
+    },
+    {
+      "width": 430,
+      "clientWidth": 430,
+      "scrollWidth": 430,
+      "bannerPosition": "fixed",
+      "bannerBottom": "0px",
+      "bannerBackground": "linear-gradient(120deg, rgb(122, 70, 50) 0%, rgb(157, 96, 67) 24%, rgb(190, 128, 89) 48%, rgb(217, 164, 119) 72%, rgb(240, 209, 172) 100%)",
+      "logoWidth": 148,
+      "logoHeight": 59.65625,
+      "studentNavCount": 0,
+      "composerCount": 0,
+      "canonical": "https://cadesca.com/post/00000000-0000-4000-8000-000000000099",
+      "structuredDataCount": 1
+    },
+    {
+      "width": 1440,
+      "clientWidth": 1440,
+      "scrollWidth": 1440,
+      "bannerPosition": "fixed",
+      "bannerBottom": "0px",
+      "bannerBackground": "linear-gradient(120deg, rgb(122, 70, 50) 0%, rgb(157, 96, 67) 24%, rgb(190, 128, 89) 48%, rgb(217, 164, 119) 72%, rgb(240, 209, 172) 100%)",
+      "logoWidth": 148,
+      "logoHeight": 59.65625,
+      "studentNavCount": 0,
+      "composerCount": 0,
+      "canonical": "https://cadesca.com/post/00000000-0000-4000-8000-000000000099",
+      "structuredDataCount": 1
+    }
+  ],
+  "consoleErrors": [
+    "WebSocket connection to 'ws://127.0.0.1:3000/_next/webpack-hmr' failed: Error during WebSocket handshake: net::ERR_INVALID_HTTP_RESPONSE",
+    "WebSocket connection to 'ws://127.0.0.1:3000/_next/webpack-hmr' failed: Error during WebSocket handshake: net::ERR_INVALID_HTTP_RESPONSE",
+    "WebSocket connection to 'ws://127.0.0.1:3000/_next/webpack-hmr' failed: Error during WebSocket handshake: net::ERR_INVALID_HTTP_RESPONSE",
+    "WebSocket connection to 'ws://127.0.0.1:3000/_next/webpack-hmr' failed: Error during WebSocket handshake: net::ERR_INVALID_HTTP_RESPONSE",
+    "WebSocket connection to 'ws://127.0.0.1:3000/_next/webpack-hmr' failed: Error during WebSocket handshake: net::ERR_INVALID_HTTP_RESPONSE",
+    "WebSocket connection to 'ws://127.0.0.1:3000/_next/webpack-hmr' failed: Error during WebSocket handshake: net::ERR_INVALID_HTTP_RESPONSE",
+    "WebSocket connection to 'ws://127.0.0.1:3000/_next/webpack-hmr' failed: Error during WebSocket handshake: net::ERR_INVALID_HTTP_RESPONSE",
+    "WebSocket connection to 'ws://127.0.0.1:3000/_next/webpack-hmr' failed: Error during WebSocket handshake: net::ERR_INVALID_HTTP_RESPONSE",
+    "WebSocket connection to 'ws://127.0.0.1:3000/_next/webpack-hmr' failed: Error during WebSocket handshake: net::ERR_INVALID_HTTP_RESPONSE",
+    "WebSocket connection to 'ws://127.0.0.1:3000/_next/webpack-hmr' failed: Error during WebSocket handshake: net::ERR_INVALID_HTTP_RESPONSE",
+    "WebSocket connection to 'ws://127.0.0.1:3000/_next/webpack-hmr' failed: Error during WebSocket handshake: net::ERR_INVALID_HTTP_RESPONSE",
+    "WebSocket connection to 'ws://127.0.0.1:3000/_next/webpack-hmr' failed: Error during WebSocket handshake: net::ERR_INVALID_HTTP_RESPONSE",
+    "WebSocket connection to 'ws://127.0.0.1:3000/_next/webpack-hmr' failed: Error during WebSocket handshake: net::ERR_INVALID_HTTP_RESPONSE",
+    "WebSocket connection to 'ws://127.0.0.1:3000/_next/webpack-hmr' failed: Error during WebSocket handshake: net::ERR_INVALID_HTTP_RESPONSE",
+    "WebSocket connection to 'ws://127.0.0.1:3000/_next/webpack-hmr' failed: Error during WebSocket handshake: net::ERR_INVALID_HTTP_RESPONSE",
+    "WebSocket connection to 'ws://127.0.0.1:3000/_next/webpack-hmr' failed: Error during WebSocket handshake: net::ERR_INVALID_HTTP_RESPONSE",
+    "WebSocket connection to 'ws://127.0.0.1:3000/_next/webpack-hmr' failed: Error during WebSocket handshake: net::ERR_INVALID_HTTP_RESPONSE",
+    "WebSocket connection to 'ws://127.0.0.1:3000/_next/webpack-hmr' failed: Error during WebSocket handshake: net::ERR_INVALID_HTTP_RESPONSE",
+    "Failed to load resource: the server responded with a status of 404 (Not Found)",
+    "WebSocket connection to 'ws://127.0.0.1:3000/_next/webpack-hmr' failed: Error during WebSocket handshake: net::ERR_INVALID_HTTP_RESPONSE"
+  ],
+  "pageErrors": []
+}

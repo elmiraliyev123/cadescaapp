@@ -273,7 +273,11 @@ function isLocalHost(host: string) {
   return host === "localhost" || host === "127.0.0.1" || host.endsWith(".localhost");
 }
 
-function publicOrigin(envKey: "NEXT_PUBLIC_AUTH_ORIGIN" | "NEXT_PUBLIC_APP_ORIGIN", fallback: string, request: NextRequest) {
+function publicOrigin(
+  envKey: "NEXT_PUBLIC_AUTH_ORIGIN" | "NEXT_PUBLIC_APP_ORIGIN" | "NEXT_PUBLIC_STUDENT_CLUB_ORIGIN",
+  fallback: string,
+  request: NextRequest
+) {
   if (isLocalHost(normalizedHost(request))) {
     return `${request.nextUrl.protocol}//${request.nextUrl.host}`;
   }
@@ -288,6 +292,10 @@ function authOrigin(request: NextRequest) {
 
 function appOrigin(request: NextRequest) {
   return publicOrigin("NEXT_PUBLIC_APP_ORIGIN", "https://app.cadesca.com", request);
+}
+
+function studentClubOrigin(request: NextRequest) {
+  return publicOrigin("NEXT_PUBLIC_STUDENT_CLUB_ORIGIN", "https://studentclub.cadesca.com", request);
 }
 
 function publicSiteOrigin(request: NextRequest) {
@@ -308,6 +316,10 @@ function isAuthRoute(pathname: string) {
     pathname === "/request-university" ||
     pathname === "/logout"
   );
+}
+
+function isStudentClubRoute(pathname: string) {
+  return pathname === "/student-club" || pathname.startsWith("/student-club/");
 }
 
 function hasSupabaseAuthCookie(request: NextRequest) {
@@ -401,8 +413,61 @@ export async function middleware(request: NextRequest) {
     host === "cadesca-app.vercel.app";
   const nonCanonicalPortalHost =
     host === "auth.cadesca.com" ||
+    host === "studentclub.cadesca.com" ||
     host === "merchant.cadesca.com" ||
     host === "adminlog.cadesca.com";
+
+  if (host === "studentclub.cadesca.com") {
+    if (pathname === "/") {
+      return finalizeResponse(
+        request,
+        applyLocaleToResponse(redirectTo(request, "/student-club"), localeResolution)
+      );
+    }
+
+    if (pathname.startsWith("/app/")) {
+      const target = new URL(`${pathname}${request.nextUrl.search}`, appOrigin(request));
+      return finalizeResponse(
+        request,
+        applyLocaleToResponse(redirectAbsolute(target.toString()), localeResolution)
+      );
+    }
+
+    if (isAuthRoute(pathname)) {
+      const target = new URL(`${pathname}${request.nextUrl.search}`, authOrigin(request));
+      return finalizeResponse(
+        request,
+        applyLocaleToResponse(redirectAbsolute(target.toString()), localeResolution)
+      );
+    }
+
+    if (
+      !isStudentClubRoute(pathname) &&
+      !isPublicProfilePath(pathname) &&
+      !isPublicPostPath(pathname) &&
+      !isPublicMediaPath(pathname)
+    ) {
+      return finalizeResponse(
+        request,
+        applyLocaleToResponse(redirectTo(request, "/student-club"), localeResolution)
+      );
+    }
+  } else if (
+    isStudentClubRoute(pathname) &&
+    !isLocalHost(host) &&
+    (host === "cadesca.com" ||
+      host === "www.cadesca.com" ||
+      authenticatedAppHost ||
+      host === "auth.cadesca.com" ||
+      host === "merchant.cadesca.com" ||
+      host === "adminlog.cadesca.com")
+  ) {
+    const target = new URL(`${pathname}${request.nextUrl.search}`, studentClubOrigin(request));
+    return finalizeResponse(
+      request,
+      applyLocaleToResponse(redirectAbsolute(target.toString()), localeResolution)
+    );
+  }
 
   if (isPublicProfilePath(pathname)) {
     if (nonCanonicalPortalHost) {

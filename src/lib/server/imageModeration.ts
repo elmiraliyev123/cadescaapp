@@ -1,6 +1,6 @@
 import "server-only";
 
-export type ImageModerationSource = "avatar" | "post";
+export type ImageModerationSource = "avatar" | "post" | "club_logo" | "event_cover";
 
 type ImageModerationProvider = "cloudflare_worker" | "workers_ai_rest" | "none";
 type CloudflareFailureKind =
@@ -101,8 +101,9 @@ const CONTENT_TYPE_BY_EXTENSION: Record<string, string> = {
 };
 const llamaLicenseAgreementCache = new Set<string>();
 
-function moderationRequired() {
-  return process.env.CLOUDFLARE_IMAGE_MODERATION_REQUIRED === "true";
+function moderationRequired(source?: ImageModerationSource) {
+  if (process.env.CLOUDFLARE_IMAGE_MODERATION_REQUIRED === "true") return true;
+  return process.env.NODE_ENV === "production" && (source === "event_cover" || source === "club_logo");
 }
 
 function moderationTimeoutMs() {
@@ -151,11 +152,13 @@ function imageContentTypeFromMagic(bytes: Uint8Array) {
 
 function normalizeImageContentType(file: File, bytes: Uint8Array) {
   const declared = normalizeDeclaredContentType(file.type || "");
-  if (declared && SUPPORTED_IMAGE_CONTENT_TYPES.has(declared)) {
-    return declared === "image/jpg" ? "image/jpeg" : declared;
-  }
-
-  return imageContentTypeFromMagic(bytes) || imageContentTypeFromName(file.name || "");
+  const fromName = imageContentTypeFromName(file.name || "");
+  const magic = imageContentTypeFromMagic(bytes);
+  if (!magic) return null;
+  const canonical = (value: string | null) => value === "image/heif" ? "image/heic" : value;
+  if (declared && (!SUPPORTED_IMAGE_CONTENT_TYPES.has(declared) || canonical(declared) !== canonical(magic))) return null;
+  if (fromName && canonical(fromName) !== canonical(magic)) return null;
+  return magic;
 }
 
 function imageDataUrl(bytes: Uint8Array, contentType: string) {
@@ -219,7 +222,7 @@ function extractJsonObject(value: string) {
 
 function isLikelyImageFile(file: File, bytes: Uint8Array) {
   if (!bytes.length) return false;
-  return Boolean(normalizeImageContentType(file, bytes) || IMAGE_EXTENSION_PATTERN.test(file.name || ""));
+  return Boolean(normalizeImageContentType(file, bytes) && IMAGE_EXTENSION_PATTERN.test(file.name || ""));
 }
 
 function providerErrorDetails(error: unknown) {
@@ -654,7 +657,7 @@ async function moderateWithWorkersAiRest(input: {
   const provider = "workers_ai_rest";
   const model = process.env.CLOUDFLARE_IMAGE_MODERATION_MODEL?.trim() || LLAMA_VISION_MODEL;
   const requestUrl = `https://api.cloudflare.com/client/v4/accounts/${accountId}/ai/run/${model}`;
-  const required = moderationRequired();
+  const required = moderationRequired(input.source);
 
   try {
     return await runWorkersAiModerationRequest({
@@ -705,7 +708,7 @@ async function runConfiguredProvider(input: {
 }
 
 export async function assertImageAllowed(file: File, source: ImageModerationSource) {
-  const required = moderationRequired();
+  const required = moderationRequired(source);
   let bytes: Uint8Array;
 
   try {

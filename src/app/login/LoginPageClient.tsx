@@ -44,11 +44,28 @@ export function LoginPageClient({ turnstileSiteKey, initialMode = "login" }: Log
       return { status: "error" as const, message: "login.invalidCredentials" as const };
     }
 
+    const data = await response.json().catch(() => ({})) as {
+      clubAccess?: {
+        available?: boolean;
+        hasActiveMembership?: boolean;
+        invitationCount?: number;
+        gatewayHref?: string;
+      };
+    };
+
     if (process.env.NODE_ENV === "development") {
       dispatch({ type: "SET_SELECTED_ROLE", payload: { role: "user", userId: "user_mock" } });
     }
 
-    window.setTimeout(() => router.push(postAuthDestination()), 0);
+    const requestedDestination = searchParams.get("next");
+    const clubAccessAvailable = data.clubAccess?.available !== false;
+    const shouldSurfaceClubAccess = clubAccessAvailable && (
+      data.clubAccess?.hasActiveMembership === true || Number(data.clubAccess?.invitationCount || 0) > 0
+    );
+    const destination = !requestedDestination && shouldSurfaceClubAccess && data.clubAccess?.gatewayHref === "/app/user/club"
+      ? data.clubAccess.gatewayHref
+      : postAuthDestination();
+    window.setTimeout(() => router.push(destination), 0);
     return { status: "authenticated" as const };
   }
 

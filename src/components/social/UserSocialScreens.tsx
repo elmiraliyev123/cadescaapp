@@ -721,6 +721,7 @@ const exploreFeatureCards: ReadonlyArray<{
   titleKey: Parameters<ReturnType<typeof useLanguage>["t"]>[0];
   descriptionKey: Parameters<ReturnType<typeof useLanguage>["t"]>[0];
   imageUrl: string;
+  href?: string;
 }> = [
   {
     icon: "home_work",
@@ -738,7 +739,8 @@ const exploreFeatureCards: ReadonlyArray<{
     icon: "event_available",
     titleKey: "social.featureEventsTitle",
     descriptionKey: "social.featureEventsDescription",
-    imageUrl: "https://images.unsplash.com/photo-1470229722913-7c0e2dbbafd3?auto=format&fit=crop&w=1400&q=82"
+    imageUrl: "https://images.unsplash.com/photo-1470229722913-7c0e2dbbafd3?auto=format&fit=crop&w=1400&q=82",
+    href: "/app/user/events"
   },
   {
     icon: "local_mall",
@@ -765,7 +767,8 @@ export function ExploreScreen({ user, posts }: { user: CurrentStudentContext | n
                     title={t(card.titleKey)}
                     description={t(card.descriptionKey)}
                     imageUrl={card.imageUrl}
-                    status={t("social.soon")}
+                    status={card.href ? t("common.explore") : t("social.soon")}
+                    href={card.href}
                   />
                 </div>
               ))}

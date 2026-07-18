@@ -1,0 +1,47 @@
+- generic [active] [ref=e1]:
+  - generic [ref=e57]:
+    - banner [ref=e58]:
+      - link "Cadesca" [ref=e60] [cursor=pointer]:
+        - /url: /
+        - img "Cadesca" [ref=e62]
+    - main [ref=e63]:
+      - article [ref=e64]:
+        - generic [ref=e65]:
+          - generic [ref=e66]:
+            - link "@elmir" [ref=e67] [cursor=pointer]:
+              - /url: https://cadesca.com/user/elmir
+              - img "elmir" [ref=e68]
+            - generic [ref=e69]:
+              - generic [ref=e70]:
+                - heading [level=1] [ref=e71]:
+                  - link "elmir" [ref=e72] [cursor=pointer]:
+                    - /url: https://cadesca.com/user/elmir
+                - button "Doğrulanmış öğrenci rozeti" [ref=e74] [cursor=pointer]:
+                  - generic [ref=e75]: verified
+              - paragraph [ref=e76]: "@elmir · Bilkent University"
+          - paragraph [ref=e77]: jj
+          - time [ref=e78]: 16 Tem 2026 21:13
+          - generic [ref=e79]:
+            - generic [ref=e80]:
+              - generic [ref=e81]: favorite
+              - text: "1"
+              - generic [ref=e82]: beğeni
+            - generic [ref=e83]:
+              - generic [ref=e84]: mode_comment
+              - text: "0"
+              - generic [ref=e85]: yorum
+            - button "Paylaş" [ref=e86] [cursor=pointer]:
+              - generic [ref=e87]: ios_share
+              - text: Paylaş
+            - status [ref=e88]
+    - complementary [ref=e89]:
+      - generic [ref=e90]:
+        - generic [ref=e91]:
+          - heading "Cadesca'da daha fazla gönderi gör" [level=2] [ref=e92]
+          - paragraph [ref=e93]: Doğrulanmış öğrenci topluluğuna katıl.
+        - generic [ref=e94]:
+          - link "Giriş yap" [ref=e95] [cursor=pointer]:
+            - /url: https://auth.cadesca.com/login?next=https%3A%2F%2Fcadesca.com%2Fpost%2F38f31124-bbd4-48c2-9db8-daf64fc5d5a2
+          - link "Kayıt ol" [ref=e96] [cursor=pointer]:
+            - /url: https://auth.cadesca.com/signup?next=https%3A%2F%2Fcadesca.com%2Fpost%2F38f31124-bbd4-48c2-9db8-daf64fc5d5a2
+  - alert [ref=e56]: "elmir on Cadesca: “jj”"

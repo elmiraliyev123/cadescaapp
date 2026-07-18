@@ -173,7 +173,17 @@ export async function verifyQrCredential(
     throw new QrCredentialError(dynamicResult.reason === "expired" ? "token_expired" : "invalid_format");
   }
 
-  return { kind: "totp", userId: dynamicResult.userId, qrTokenId: null, token: credential, uniqueWalletPassId: null, totpCounter: null };
+  if (typeof dynamicResult.counter !== "number" || !Number.isSafeInteger(dynamicResult.counter)) {
+    throw new QrCredentialError("invalid_format");
+  }
+  return {
+    kind: "totp",
+    userId: dynamicResult.userId,
+    qrTokenId: null,
+    token: credential,
+    uniqueWalletPassId: null,
+    totpCounter: dynamicResult.counter
+  };
 }
 
 export async function markStoredQrTokenAsUsed(qrTokenId: string, client?: PoolClient) {
@@ -181,15 +191,27 @@ export async function markStoredQrTokenAsUsed(qrTokenId: string, client?: PoolCl
   const result = await executor.query(
     `UPDATE qr_tokens
      SET status = 'used', used_at = now()
-     WHERE id = $1 AND status = 'active'`,
+     WHERE id = $1
+       AND status = 'active'
+       AND expires_at > now()`,
     [qrTokenId]
   );
   return result.rowCount === 1;
 }
 
 export async function markTotpCredentialAsUsed(credential: QrCredential, client: PoolClient) {
-  if (credential.kind !== "totp" || !credential.uniqueWalletPassId || credential.totpCounter === null) {
-    return true;
+  if (credential.kind !== "totp" || credential.totpCounter === null) {
+    return false;
+  }
+  if (!credential.uniqueWalletPassId) {
+    const result = await client.query(
+      `insert into public.qr_credential_uses (user_id, kind, counter)
+       values ($1, 'legacy_totp', $2)
+       on conflict (user_id, kind, counter) do nothing
+       returning id`,
+      [credential.userId, credential.totpCounter]
+    );
+    return result.rowCount === 1;
   }
 
   return consumeGoogleWalletTotpCounter({

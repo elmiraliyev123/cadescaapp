@@ -27,6 +27,7 @@ type TurnstileWidgetProps = {
   action: string;
   resetSignal: number;
   onVerify: (token: string) => void;
+  errorMessage?: string;
 };
 
 let scriptPromise: Promise<void> | null = null;
@@ -67,7 +68,7 @@ function loadTurnstileScript() {
   return scriptPromise;
 }
 
-export function TurnstileWidget({ siteKey, action, resetSignal, onVerify }: TurnstileWidgetProps) {
+export function TurnstileWidget({ siteKey, action, resetSignal, onVerify, errorMessage }: TurnstileWidgetProps) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const widgetIdRef = useRef<string | null>(null);
   const [isMounted, setIsMounted] = useState(false);
@@ -148,7 +149,7 @@ export function TurnstileWidget({ siteKey, action, resetSignal, onVerify }: Turn
       <div ref={containerRef} className="min-h-[65px]" />
       {hasWidgetError ? (
         <p className="px-1 pb-1 text-caption font-semibold text-secondary">
-          Security verification failed to load. Please refresh and try again.
+          {errorMessage || "Security verification failed to load. Please refresh and try again."}
         </p>
       ) : null}
     </div>

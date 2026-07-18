@@ -5,10 +5,14 @@ import { cn } from "@/lib/utils";
 
 export function AppTopBar({
   variant = "student",
-  className
+  className,
+  eventsHref,
+  eventsLabel
 }: {
   variant?: "student" | "public";
   className?: string;
+  eventsHref?: string;
+  eventsLabel?: string;
 }) {
   const isPublic = variant === "public";
 
@@ -24,7 +28,7 @@ export function AppTopBar({
     >
       <div
         className={cn(
-          "mx-auto flex w-full items-center justify-center px-4",
+          "relative mx-auto flex w-full items-center justify-center px-4",
           isPublic ? "max-w-[720px] justify-start sm:px-6" : "max-w-[520px]"
         )}
       >
@@ -38,6 +42,16 @@ export function AppTopBar({
             imgClassName="block h-auto max-w-full object-contain"
           />
         </Link>
+        {!isPublic && eventsHref && eventsLabel ? (
+          <Link
+            href={eventsHref}
+            aria-label={eventsLabel}
+            title={eventsLabel}
+            className="absolute right-4 inline-flex h-11 w-11 items-center justify-center rounded-full border border-black bg-[#ffd400] text-black shadow-[2px_2px_0_#000] transition-transform active:translate-y-0.5 active:shadow-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-black focus-visible:ring-offset-2"
+          >
+            <span className="material-symbols-outlined text-[22px]" aria-hidden="true">event</span>
+          </Link>
+        ) : null}
       </div>
     </header>
   );

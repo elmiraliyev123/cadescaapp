@@ -1,0 +1,61 @@
+- generic [active] [ref=e1]:
+  - generic [ref=e3]:
+    - banner [ref=e4]:
+      - link "Cadesca" [ref=e6] [cursor=pointer]:
+        - /url: /
+        - img "Cadesca" [ref=e8]
+    - main [ref=e9]:
+      - generic [ref=e10]:
+        - generic [ref=e11]:
+          - img "elmir" [ref=e12]
+          - generic [ref=e13]:
+            - generic [ref=e14]:
+              - heading "elmir" [level=1] [ref=e15]
+              - button "Doğrulanmış öğrenci rozeti" [ref=e17] [cursor=pointer]:
+                - generic [ref=e18]: verified
+            - paragraph [ref=e19]: "@elmir"
+            - paragraph [ref=e20]: Bilkent University
+            - paragraph [ref=e21]: 2 Gönderiler
+        - paragraph [ref=e22]: bomba kimi heyat
+      - region [ref=e23]:
+        - heading "Gönderiler" [level=2] [ref=e24]
+        - generic [ref=e25]:
+          - article [ref=e26]:
+            - link "jj 16 Tem 2026 1 beğeni 0 yorum" [ref=e27] [cursor=pointer]:
+              - /url: /post/38f31124-bbd4-48c2-9db8-daf64fc5d5a2
+              - paragraph [ref=e28]: jj
+              - generic [ref=e29]:
+                - time [ref=e30]: 16 Tem 2026
+                - generic [ref=e31]:
+                  - generic [ref=e32]: favorite
+                  - text: "1"
+                  - generic [ref=e33]: beğeni
+                - generic [ref=e34]:
+                  - generic [ref=e35]: mode_comment
+                  - text: "0"
+                  - generic [ref=e36]: yorum
+          - article [ref=e37]:
+            - link "bugün hava necədi 16 Tem 2026 1 beğeni 0 yorum" [ref=e38] [cursor=pointer]:
+              - /url: /post/33c4ab5e-38a3-4a1a-8c1e-843f5bae6267
+              - paragraph [ref=e39]: bugün hava necədi
+              - generic [ref=e40]:
+                - time [ref=e41]: 16 Tem 2026
+                - generic [ref=e42]:
+                  - generic [ref=e43]: favorite
+                  - text: "1"
+                  - generic [ref=e44]: beğeni
+                - generic [ref=e45]:
+                  - generic [ref=e46]: mode_comment
+                  - text: "0"
+                  - generic [ref=e47]: yorum
+    - complementary [ref=e48]:
+      - generic [ref=e49]:
+        - generic [ref=e50]:
+          - heading "Cadesca'da daha fazla gönderi gör" [level=2] [ref=e51]
+          - paragraph [ref=e52]: Doğrulanmış öğrenci topluluğuna katıl.
+        - generic [ref=e53]:
+          - link "Giriş yap" [ref=e54] [cursor=pointer]:
+            - /url: https://auth.cadesca.com/login?next=https%3A%2F%2Fcadesca.com%2Fuser%2Felmir
+          - link "Kayıt ol" [ref=e55] [cursor=pointer]:
+            - /url: https://auth.cadesca.com/signup?next=https%3A%2F%2Fcadesca.com%2Fuser%2Felmir
+  - alert [ref=e56]

@@ -1,0 +1,47 @@
+- generic [active] [ref=e1]:
+  - link "Skip to content":
+    - /url: "#geist-skip-nav"
+  - generic [ref=e3]:
+    - banner [ref=e4]:
+      - link "Vercel logo":
+        - /url: /home
+        - button "Vercel Logo":
+          - img "Vercel Logo"
+      - navigation [ref=e5]:
+        - navigation [ref=e6]:
+          - link [ref=e7] [cursor=pointer]:
+            - /url: /signup?next=%2Fsso-api%3Furl%3Dhttps%253A%252F%252Fcadesca-rfygkk81t-elmirs-projects-b57ef0c7.vercel.app%252Fpost%252F38f31124-bbd4-48c2-9db8-daf64fc5d5a2%26nonce%3D512a0403a16fd77b21020bdfff979a21ddfa5aad5d6f18988f8321bdc09e8ad8
+            - paragraph [ref=e9]: Sign Up
+    - main [ref=e10]:
+      - generic [ref=e12]:
+        - heading "Log in to Vercel" [level=1] [ref=e15]
+        - generic [ref=e16]:
+          - generic [ref=e17]:
+            - textbox "Email Address" [ref=e19]
+            - button "Continue with Email" [ref=e20] [cursor=pointer]
+          - generic [ref=e23]:
+            - button "Continue with Google" [ref=e24] [cursor=pointer]:
+              - generic [ref=e29]:
+                - generic [ref=e30]: Continue with
+                - text: Google
+            - button "Continue with GitHub" [ref=e31] [cursor=pointer]:
+              - generic [ref=e35]:
+                - generic [ref=e36]: Continue with
+                - text: GitHub
+            - button "Continue with Apple" [ref=e37] [cursor=pointer]:
+              - generic [ref=e41]:
+                - generic [ref=e42]: Continue with
+                - text: Apple
+            - button "Continue with SAML SSO" [ref=e44] [cursor=pointer]
+            - button "Continue with Passkey" [ref=e49] [cursor=pointer]
+            - button "Show other options" [ref=e54] [cursor=pointer]
+        - paragraph [ref=e57]:
+          - text: Don't have an account?
+          - link "Sign Up" [ref=e58] [cursor=pointer]:
+            - /url: /signup?next=%2Fsso-api%3Furl%3Dhttps%253A%252F%252Fcadesca-rfygkk81t-elmirs-projects-b57ef0c7.vercel.app%252Fpost%252F38f31124-bbd4-48c2-9db8-daf64fc5d5a2%26nonce%3D512a0403a16fd77b21020bdfff979a21ddfa5aad5d6f18988f8321bdc09e8ad8
+      - generic [ref=e61]:
+        - link "Terms" [ref=e62] [cursor=pointer]:
+          - /url: /legal/terms
+        - link "Privacy Policy" [ref=e63] [cursor=pointer]:
+          - /url: /legal/privacy-policy
+  - alert [ref=e64]

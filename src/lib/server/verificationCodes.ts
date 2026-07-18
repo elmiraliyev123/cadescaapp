@@ -8,7 +8,7 @@ import { getPool as getSharedDbPool, MerchantDbError } from "./merchants";
 export const VERIFICATION_CODE_TTL_MS = 10 * 60 * 1000;
 export const MAX_VERIFICATION_ATTEMPTS = 5;
 
-export type EmailVerificationPurpose = "signup" | "login" | "password_reset";
+export type EmailVerificationPurpose = "signup" | "login" | "password_reset" | "club_application";
 
 export type EmailVerificationCode = {
   id: string;
@@ -117,7 +117,7 @@ async function ensureVerificationTable() {
       id text PRIMARY KEY,
       email text NOT NULL,
       code_hash text NOT NULL,
-      purpose text NOT NULL CHECK (purpose IN ('signup', 'login', 'password_reset')),
+      purpose text NOT NULL CHECK (purpose IN ('signup', 'login', 'password_reset', 'club_application')),
       expires_at timestamptz NOT NULL,
       consumed_at timestamptz,
       attempts integer NOT NULL DEFAULT 0,
@@ -127,6 +127,13 @@ async function ensureVerificationTable() {
     CREATE INDEX IF NOT EXISTS email_verification_codes_active_idx
       ON email_verification_codes (email, purpose, created_at DESC)
       WHERE consumed_at IS NULL;
+
+    ALTER TABLE public.email_verification_codes
+      DROP CONSTRAINT IF EXISTS email_verification_codes_purpose_check;
+
+    ALTER TABLE public.email_verification_codes
+      ADD CONSTRAINT email_verification_codes_purpose_check
+      CHECK (purpose IN ('signup', 'login', 'password_reset', 'club_application'));
   `).then(() => undefined);
 
   await store.tableReady;

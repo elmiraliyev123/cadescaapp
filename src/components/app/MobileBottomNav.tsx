@@ -9,6 +9,7 @@ import { useLanguage } from "@/lib/i18n";
 export function MobileBottomNav({ navItems, currentPath }: { navItems: NavItem[]; currentPath: string }) {
   const { t } = useLanguage();
   const [unreadNotifications, setUnreadNotifications] = useState(0);
+  const compact = navItems.length > 5;
 
   useEffect(() => {
     const updateCount = (event?: Event) => {
@@ -36,7 +37,10 @@ export function MobileBottomNav({ navItems, currentPath }: { navItems: NavItem[]
                 aria-label={t(item.i18nKey)}
                 aria-current={active ? "page" : undefined}
               >
-                <span className="flex h-[60px] w-[60px] aspect-square shrink-0 items-center justify-center rounded-full bg-primary p-0 text-on-primary shadow-md transition-transform active:scale-95">
+                <span className={cn(
+                  "flex aspect-square shrink-0 items-center justify-center rounded-full bg-primary p-0 text-on-primary shadow-md transition-transform active:scale-95",
+                  compact ? "h-[50px] w-[50px]" : "h-[60px] w-[60px]"
+                )}>
                   <span className="material-symbols-outlined icon-create leading-none" aria-hidden="true">add</span>
                 </span>
               </Link>
@@ -65,7 +69,10 @@ export function MobileBottomNav({ navItems, currentPath }: { navItems: NavItem[]
                   <span className="absolute right-0 top-0 h-1.5 w-1.5 rounded-full bg-primary ring-2 ring-surface" aria-hidden="true" />
                 ) : null}
               </span>
-              <span className="max-w-full whitespace-normal text-center text-[11.5px] font-medium leading-[14px] [overflow-wrap:anywhere]">
+              <span className={cn(
+                "max-w-full whitespace-normal text-center font-medium [overflow-wrap:anywhere]",
+                compact ? "text-[10px] leading-[12px]" : "text-[11.5px] leading-[14px]"
+              )}>
                 {t(item.i18nKey)}
               </span>
               {active ? <span className="h-0.5 w-3 rounded-full bg-primary" /> : null}

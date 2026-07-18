@@ -5,8 +5,16 @@ import { authenticateUserInDb } from "@/lib/server/users";
 import { USER_SESSION_COOKIE, createUserSessionToken } from "@/lib/server/userSession";
 import { signInSupabaseAuthOnResponse, SupabaseAuthBridgeError } from "@/lib/server/supabaseAuthBridge";
 import { withSharedCookieDomain } from "@/lib/cookieDomain";
+import { getUserClubAccessSummary, type UserClubAccessSummary } from "@/lib/server/studentClubs";
 
 export const runtime = "nodejs";
+
+const NO_CLUB_ACCESS: UserClubAccessSummary = {
+  available: true,
+  hasActiveMembership: false,
+  invitationCount: 0,
+  gatewayHref: "/app/user/club"
+};
 
 export async function POST(request: Request) {
   const body = (await request.json().catch(() => ({}))) as { email?: string; password?: string; turnstileToken?: string };
@@ -30,7 +38,11 @@ export async function POST(request: Request) {
       sameSite: "lax",
       maxAge: 3600
     }));
-    return NextResponse.json({ ok: true, user: { id: "user_mock", name: "Demo User", email: body.email, role: "user" } });
+    return NextResponse.json({
+      ok: true,
+      user: { id: "user_mock", name: "Demo User", email: body.email, role: "user" },
+      clubAccess: NO_CLUB_ACCESS
+    });
   }
 
   try {
@@ -59,7 +71,17 @@ export async function POST(request: Request) {
     }
 
     const session = await createUserSessionToken(user.id, user.email, "user", secret);
-    const response = NextResponse.json({ ok: true, user: { id: user.id, name: user.name, email: user.email, role: user.role } });
+    const clubAccess = await getUserClubAccessSummary(user.id).catch((error) => {
+      console.error("[user_login] club_access_resolution_failed", {
+        reason: error instanceof Error ? error.name : "unknown"
+      });
+      return { ...NO_CLUB_ACCESS, available: false };
+    });
+    const response = NextResponse.json({
+      ok: true,
+      user: { id: user.id, name: user.name, email: user.email, role: user.role },
+      clubAccess
+    });
 
     response.cookies.set(USER_SESSION_COOKIE, session.token, withSharedCookieDomain({
       httpOnly: true,

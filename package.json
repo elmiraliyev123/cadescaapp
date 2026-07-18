@@ -9,6 +9,9 @@
     "dev": "next dev",
     "start": "next start",
     "build": "next build",
+    "test:clubs": "node --conditions=react-server --import tsx scripts/test-club-onboarding.ts",
+    "test:events": "node --import tsx scripts/test-events-domain.ts",
+    "test:events:db": "node --import tsx scripts/test-events-db.ts",
     "test:moderation": "node --conditions=react-server --import tsx scripts/test-moderation.ts",
     "test:seo": "node --import tsx scripts/test-seo-structured-data.ts",
     "typecheck": "tsc --noEmit"

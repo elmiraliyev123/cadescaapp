@@ -8,6 +8,7 @@ import { getReadyPool } from "@/lib/server/users";
 import { ensureUniversitySchemaReady, normalizeEmailDomains, normalizeUniversitySlug } from "@/lib/server/universities";
 import { getSupabaseAdminClient } from "@/lib/supabase/admin";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { normalizeCadescaUsername, validateCadescaUsername } from "@/lib/usernames";
 
 export type CurrentStudentContext = {
   id: string;
@@ -271,24 +272,6 @@ const EXTENSION_BY_MIME_TYPE: Record<string, string> = {
   "image/avif": "avif",
   "image/gif": "gif"
 };
-const USERNAME_PATTERN = /^[a-z0-9_][a-z0-9_.]{1,28}[a-z0-9_]$/;
-const RESERVED_USERNAMES = new Set([
-  "admin",
-  "app",
-  "api",
-  "login",
-  "register",
-  "wallet",
-  "merchant",
-  "support",
-  "help",
-  "settings",
-  "profile",
-  "cadesca",
-  "root",
-  "system"
-]);
-
 function iso(value: Date | string | null | undefined) {
   if (!value) return null;
   return value instanceof Date ? value.toISOString() : new Date(value).toISOString();
@@ -354,17 +337,11 @@ async function resolveAvatarUrl(value: string | null | undefined) {
 }
 
 export function normalizeUsernameInput(value: string) {
-  return value.trim().toLowerCase();
+  return normalizeCadescaUsername(value);
 }
 
 export function validateUsernameInput(value: string) {
-  const username = normalizeUsernameInput(value);
-  if (!username) throw new Error("username_required");
-  if (username.length < 3 || username.length > 30) throw new Error("invalid_username");
-  if (!USERNAME_PATTERN.test(username)) throw new Error("invalid_username");
-  if (username.includes("..")) throw new Error("invalid_username");
-  if (RESERVED_USERNAMES.has(username)) throw new Error("reserved_username");
-  return username;
+  return validateCadescaUsername(value);
 }
 
 function getPgCode(error: unknown) {
@@ -493,9 +470,12 @@ export async function getCurrentStudentContext(): Promise<CurrentStudentContext 
        from public.users app_user
        left join public.universities university
          on university.id = app_user.university_id
-       where ($1::uuid is not null and app_user.auth_user_id = $1::uuid)
-          or ($2::text is not null and app_user.id = $2::text)
-       order by app_user.auth_user_id is not null desc
+       where (
+         ($1::uuid is not null and $2::text is not null
+           and app_user.auth_user_id = $1::uuid and app_user.id = $2::text)
+         or ($1::uuid is not null and $2::text is null and app_user.auth_user_id = $1::uuid)
+         or ($1::uuid is null and $2::text is not null and app_user.id = $2::text)
+       )
        limit 1`,
       [authUserId, legacyUserId]
     );
@@ -526,9 +506,12 @@ export async function getCurrentStudentContext(): Promise<CurrentStudentContext 
          app_user.verified_via,
          app_user.created_at
        from public.users app_user
-       where ($1::uuid is not null and app_user.auth_user_id = $1::uuid)
-          or ($2::text is not null and app_user.id = $2::text)
-       order by app_user.auth_user_id is not null desc
+       where (
+         ($1::uuid is not null and $2::text is not null
+           and app_user.auth_user_id = $1::uuid and app_user.id = $2::text)
+         or ($1::uuid is not null and $2::text is null and app_user.auth_user_id = $1::uuid)
+         or ($1::uuid is null and $2::text is not null and app_user.id = $2::text)
+       )
        limit 1`,
       [authUserId, legacyUserId]
     );

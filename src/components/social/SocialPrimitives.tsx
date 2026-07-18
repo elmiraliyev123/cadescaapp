@@ -201,15 +201,17 @@ export function FeatureBanner({
   title,
   description,
   imageUrl,
-  status
+  status,
+  href
 }: {
   icon: string;
   title: string;
   description: string;
   imageUrl: string;
   status: string;
+  href?: string;
 }) {
-  return (
+  const content = (
     <article
       className="group relative aspect-[16/10] w-[clamp(260px,76vw,290px)] flex-[0_0_clamp(260px,76vw,290px)] overflow-hidden rounded-xl bg-primary text-white"
       aria-label={`${title}. ${description}. ${status}`}
@@ -232,6 +234,11 @@ export function FeatureBanner({
       </div>
     </article>
   );
+  return href ? (
+    <Link href={href} className="block rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2">
+      {content}
+    </Link>
+  ) : content;
 }
 
 export function NotificationRow({

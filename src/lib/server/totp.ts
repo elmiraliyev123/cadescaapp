@@ -191,14 +191,16 @@ function parseLegacyDynamicQrPayload(scannedPayload: string) {
 export function verifyDynamicQR(
   scannedPayload: string,
   now = Date.now()
-): { valid: boolean; userId?: string; reason?: "invalid_format" | "expired" | "server_misconfigured" } {
+): { valid: boolean; userId?: string; counter?: number; reason?: "invalid_format" | "expired" | "server_misconfigured" } {
   const parsed = parseLegacyDynamicQrPayload(scannedPayload);
   if (!parsed) return { valid: false, reason: "invalid_format" };
 
   try {
     const secretBase64 = getUserTotpSecretBase64(parsed.userId);
     const result = verifyNativeTOTP(parsed.totp, secretBase64, LEGACY_TOTP_PERIOD_SECONDS, TOTP_ALLOWED_WINDOW, now);
-    return result.valid ? { valid: true, userId: parsed.userId } : { valid: false, reason: "expired" };
+    return result.valid && typeof result.counter === "number"
+      ? { valid: true, userId: parsed.userId, counter: result.counter }
+      : { valid: false, reason: "expired" };
   } catch {
     return { valid: false, reason: "server_misconfigured" };
   }

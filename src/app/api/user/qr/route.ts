@@ -2,7 +2,6 @@ import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { USER_SESSION_COOKIE, verifyUserSessionToken } from "@/lib/server/userSession";
 import { createFreshQrTokenForUser } from "@/lib/server/qr";
-import { hasUserCheckedInToday } from "@/lib/server/check_ins";
 import { getReadyPool } from "@/lib/server/users";
 
 export const runtime = "nodejs";
@@ -34,11 +33,8 @@ export async function GET() {
       return NextResponse.json({ error: "not_eligible" }, { status: 403 });
     }
 
-    const usedToday = await hasUserCheckedInToday(user.id);
-    if (usedToday) {
-      return NextResponse.json({ error: "already_used_today" }, { status: 403 });
-    }
-
+    // This endpoint issues an identity credential, not a meal entitlement.
+    // Restaurant daily-use rules remain enforced atomically by merchant check-in.
     const qrRecord = await createFreshQrTokenForUser(user.id);
 
     return NextResponse.json({

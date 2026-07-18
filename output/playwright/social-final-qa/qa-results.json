@@ -1,0 +1,306 @@
+{
+  "widths": [
+    {
+      "width": 320,
+      "clientWidth": 320,
+      "scrollWidth": 320,
+      "bodyScrollWidth": 320,
+      "navHeight": 79,
+      "navDisplay": "block",
+      "circleWidth": 60,
+      "circleHeight": 60,
+      "circleRadius": "9999px",
+      "mainPaddingBottom": 88
+    },
+    {
+      "width": 375,
+      "clientWidth": 375,
+      "scrollWidth": 375,
+      "bodyScrollWidth": 375,
+      "navHeight": 79,
+      "navDisplay": "block",
+      "circleWidth": 60,
+      "circleHeight": 60,
+      "circleRadius": "9999px",
+      "mainPaddingBottom": 88
+    },
+    {
+      "width": 390,
+      "clientWidth": 390,
+      "scrollWidth": 390,
+      "bodyScrollWidth": 390,
+      "navHeight": 79,
+      "navDisplay": "block",
+      "circleWidth": 60,
+      "circleHeight": 60,
+      "circleRadius": "9999px",
+      "mainPaddingBottom": 88
+    },
+    {
+      "width": 430,
+      "clientWidth": 430,
+      "scrollWidth": 430,
+      "bodyScrollWidth": 430,
+      "navHeight": 79,
+      "navDisplay": "block",
+      "circleWidth": 60,
+      "circleHeight": 60,
+      "circleRadius": "9999px",
+      "mainPaddingBottom": 88
+    }
+  ],
+  "desktop": [
+    {
+      "width": 1280,
+      "clientWidth": 1280,
+      "scrollWidth": 1280,
+      "bodyScrollWidth": 1280,
+      "navHeight": 0,
+      "navDisplay": "none",
+      "circleWidth": 0,
+      "circleHeight": 0,
+      "circleRadius": "9999px",
+      "mainPaddingBottom": 32,
+      "sidebarWidth": 260,
+      "mainLeft": 260,
+      "articleWidth": 644
+    },
+    {
+      "width": 1440,
+      "clientWidth": 1440,
+      "scrollWidth": 1440,
+      "bodyScrollWidth": 1440,
+      "navHeight": 0,
+      "navDisplay": "none",
+      "circleWidth": 0,
+      "circleHeight": 0,
+      "circleRadius": "9999px",
+      "mainPaddingBottom": 32,
+      "sidebarWidth": 260,
+      "mainLeft": 260,
+      "articleWidth": 680
+    }
+  ],
+  "languages": [
+    {
+      "locale": "en",
+      "expected": {
+        "home": "Home",
+        "explore": "Explore",
+        "notifications": "Notifications",
+        "profile": "Profile",
+        "events": "Events"
+      },
+      "homeMetrics": {
+        "clientWidth": 320,
+        "scrollWidth": 320,
+        "bodyScrollWidth": 320,
+        "navHeight": 79,
+        "navDisplay": "block",
+        "circleWidth": 60,
+        "circleHeight": 60,
+        "circleRadius": "9999px",
+        "mainPaddingBottom": 88
+      },
+      "profileMetrics": {
+        "clientWidth": 320,
+        "scrollWidth": 320,
+        "bodyScrollWidth": 320,
+        "navHeight": 79,
+        "navDisplay": "block",
+        "circleWidth": 60,
+        "circleHeight": 60,
+        "circleRadius": "9999px",
+        "mainPaddingBottom": 88
+      }
+    },
+    {
+      "locale": "az",
+      "expected": {
+        "home": "Ana səhifə",
+        "explore": "Kəşf et",
+        "notifications": "Bildirişlər",
+        "profile": "Profil",
+        "events": "Tədbirlər"
+      },
+      "homeMetrics": {
+        "clientWidth": 320,
+        "scrollWidth": 320,
+        "bodyScrollWidth": 320,
+        "navHeight": 79,
+        "navDisplay": "block",
+        "circleWidth": 60,
+        "circleHeight": 60,
+        "circleRadius": "9999px",
+        "mainPaddingBottom": 88
+      },
+      "profileMetrics": {
+        "clientWidth": 320,
+        "scrollWidth": 320,
+        "bodyScrollWidth": 320,
+        "navHeight": 79,
+        "navDisplay": "block",
+        "circleWidth": 60,
+        "circleHeight": 60,
+        "circleRadius": "9999px",
+        "mainPaddingBottom": 88
+      }
+    },
+    {
+      "locale": "tr",
+      "expected": {
+        "home": "Ana sayfa",
+        "explore": "Keşfet",
+        "notifications": "Bildirimler",
+        "profile": "Profil",
+        "events": "Etkinlikler"
+      },
+      "homeMetrics": {
+        "clientWidth": 320,
+        "scrollWidth": 320,
+        "bodyScrollWidth": 320,
+        "navHeight": 79,
+        "navDisplay": "block",
+        "circleWidth": 60,
+        "circleHeight": 60,
+        "circleRadius": "9999px",
+        "mainPaddingBottom": 88
+      },
+      "profileMetrics": {
+        "clientWidth": 320,
+        "scrollWidth": 320,
+        "bodyScrollWidth": 320,
+        "navHeight": 79,
+        "navDisplay": "block",
+        "circleWidth": 60,
+        "circleHeight": 60,
+        "circleRadius": "9999px",
+        "mainPaddingBottom": 88
+      }
+    },
+    {
+      "locale": "ru",
+      "expected": {
+        "home": "Главная",
+        "explore": "Обзор",
+        "notifications": "Уведомления",
+        "profile": "Профиль",
+        "events": "События"
+      },
+      "homeMetrics": {
+        "clientWidth": 320,
+        "scrollWidth": 320,
+        "bodyScrollWidth": 320,
+        "navHeight": 79,
+        "navDisplay": "block",
+        "circleWidth": 60,
+        "circleHeight": 60,
+        "circleRadius": "9999px",
+        "mainPaddingBottom": 88
+      },
+      "profileMetrics": {
+        "clientWidth": 320,
+        "scrollWidth": 320,
+        "bodyScrollWidth": 320,
+        "navHeight": 79,
+        "navDisplay": "block",
+        "circleWidth": 60,
+        "circleHeight": 60,
+        "circleRadius": "9999px",
+        "mainPaddingBottom": 88
+      }
+    }
+  ],
+  "interactions": {
+    "home": {
+      "composerHeight": 72,
+      "initialCommentCount": 1,
+      "expandedCommentCount": 4,
+      "verifiedSize": {
+        "width": 16,
+        "height": 16,
+        "iconSize": 15,
+        "hitInset": "-14px"
+      }
+    },
+    "create": {
+      "inputFileCounts": [
+        0,
+        1
+      ],
+      "actionRequests": 1
+    },
+    "explore": {
+      "bannerMetrics": [
+        {
+          "width": 280,
+          "height": 175,
+          "titleOverflow": "clip"
+        },
+        {
+          "width": 280,
+          "height": 175,
+          "titleOverflow": "clip"
+        },
+        {
+          "width": 280,
+          "height": 175,
+          "titleOverflow": "clip"
+        },
+        {
+          "width": 280,
+          "height": 175,
+          "titleOverflow": "clip"
+        }
+      ],
+      "horizontalScroll": {
+        "clientWidth": 358,
+        "scrollWidth": 1156
+      }
+    },
+    "notifications": {
+      "unreadBefore": 3,
+      "groupText": [
+        "BU GÜN",
+        "BU HƏFTƏ",
+        "DAHA ƏVVƏL"
+      ],
+      "navUnreadBefore": 1
+    },
+    "profile": {
+      "statTops": [
+        148,
+        148,
+        148
+      ],
+      "statHeights": [
+        66,
+        66,
+        66
+      ],
+      "actionHeights": [
+        44,
+        44,
+        44
+      ],
+      "actionOverflow": [
+        0,
+        0,
+        0
+      ],
+      "scrollWidth": 390,
+      "clientWidth": 390
+    }
+  },
+  "platform": {
+    "ios": {
+      "walletLinks": 1
+    },
+    "android": {
+      "walletLinks": 0,
+      "unavailable": 1
+    }
+  },
+  "consoleErrors": [],
+  "pageErrors": []
+}

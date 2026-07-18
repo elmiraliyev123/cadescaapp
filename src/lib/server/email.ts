@@ -2,7 +2,7 @@ import "server-only";
 
 import { Resend } from "resend";
 
-export type VerificationEmailLocale = "az" | "en" | "ru";
+export type VerificationEmailLocale = "az" | "en" | "ru" | "tr";
 
 type SendVerificationEmailInput = {
   to: string;
@@ -96,6 +96,21 @@ function verificationEmailCopy(locale: VerificationEmailLocale = "az", code: str
       subject: "Ваш код подтверждения Cadesca",
       text,
       html: `<p>Здравствуйте, ${escapeHtml(displayName)},</p><p>Ваш код подтверждения Cadesca: <strong style="font-size:24px;letter-spacing:4px">${code}</strong></p><p>Код действителен в течение 10 минут.</p><p>Не передавайте этот код другим людям.</p>`
+    };
+  }
+
+  if (locale === "tr") {
+    const text = [
+      `Merhaba ${displayName},`,
+      `Cadesca doğrulama kodunuz: ${code}`,
+      "Bu kod 10 dakika boyunca geçerlidir.",
+      "Bu kodu hiç kimseyle paylaşmayın."
+    ].join("\n");
+
+    return {
+      subject: "Cadesca doğrulama kodunuz",
+      text,
+      html: `<p>Merhaba ${escapeHtml(displayName)},</p><p>Cadesca doğrulama kodunuz: <strong style="font-size:24px;letter-spacing:4px">${code}</strong></p><p>Bu kod 10 dakika boyunca geçerlidir.</p><p>Bu kodu hiç kimseyle paylaşmayın.</p>`
     };
   }
 

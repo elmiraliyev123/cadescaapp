@@ -15,6 +15,13 @@ export function getAuthUrl() {
   return normalizePublicUrl(process.env.NEXT_PUBLIC_AUTH_ORIGIN || process.env.NEXT_PUBLIC_AUTH_URL, "https://auth.cadesca.com");
 }
 
+export function getStudentClubUrl() {
+  return normalizePublicUrl(
+    process.env.NEXT_PUBLIC_STUDENT_CLUB_ORIGIN || process.env.NEXT_PUBLIC_STUDENT_CLUB_URL,
+    "https://studentclub.cadesca.com"
+  );
+}
+
 export function getMerchantUrl() {
   return normalizePublicUrl(process.env.NEXT_PUBLIC_MERCHANT_URL, "https://merchant.cadesca.com");
 }
@@ -30,6 +37,7 @@ export function getApiUrl() {
 export const appUrl = getAppUrl();
 export const publicUrl = getPublicUrl();
 export const authUrl = getAuthUrl();
+export const studentClubUrl = getStudentClubUrl();
 export const merchantUrl = getMerchantUrl();
 export const adminUrl = getAdminUrl();
 export const apiUrl = getApiUrl();

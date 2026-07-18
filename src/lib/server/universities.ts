@@ -296,6 +296,18 @@ export async function findActiveUniversityByEmail(email: string) {
   return result.rows[0] ? mapUniversity(result.rows[0]) : null;
 }
 
+export async function listActiveUniversities(): Promise<UniversityRecord[]> {
+  const pool = await ensureUniversitySchemaReady();
+  const result = await pool.query(
+    `SELECT *
+     FROM public.universities
+     WHERE status = 'active'
+     ORDER BY name ASC`
+  );
+
+  return result.rows.map(mapUniversity);
+}
+
 export async function createUniversityAccessRequest(input: {
   email: string;
   universityName?: string | null;

@@ -29,12 +29,14 @@ type VerifyEmailRequest = {
   turnstileToken?: string;
 };
 
-function parsePurpose(value: unknown): EmailVerificationPurpose {
-  return value === "login" || value === "password_reset" || value === "signup" ? value : "signup";
+function parsePurpose(value: unknown): Exclude<EmailVerificationPurpose, "club_application"> {
+  return value === "login" || value === "password_reset" || value === "signup"
+    ? value
+    : "signup";
 }
 
 function parseLocale(value: unknown): VerificationEmailLocale {
-  return value === "en" || value === "ru" || value === "az" ? value : "az";
+  return value === "en" || value === "ru" || value === "az" || value === "tr" ? value : "az";
 }
 
 function jsonError(message: string, status: number) {

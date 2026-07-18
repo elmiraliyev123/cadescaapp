@@ -342,7 +342,10 @@ export async function POST(request: Request) {
       if (recovered) return recovered;
       return NextResponse.json({ error: "email_in_use" }, { status: 409 });
     }
-    if (error instanceof Error && (error.message === "duplicate_username" || error.message === "invalid_username")) {
+    if (
+      error instanceof Error &&
+      (error.message === "duplicate_username" || error.message === "invalid_username" || error.message === "reserved_username")
+    ) {
       return NextResponse.json({ error: error.message }, { status: 409 });
     }
     if (error instanceof SupabaseAuthBridgeError) {

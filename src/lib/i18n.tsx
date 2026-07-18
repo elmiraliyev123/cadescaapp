@@ -18,6 +18,7 @@ export const translations = {
     common: {
       home: "Home",
       explore: "Explore",
+      club: "Club",
       wallet: "Wallet",
       cadescaMenu: "Cadesca Menu",
       travel: "Travel",
@@ -662,6 +663,7 @@ export const translations = {
     common: {
       home: "Ana səhifə",
       explore: "Kəşf et",
+      club: "Klub",
       wallet: "Pul kisəsi",
       cadescaMenu: "Cadesca menyusu",
       travel: "Səyahət",
@@ -1303,6 +1305,7 @@ export const translations = {
     common: {
       home: "Главная",
       explore: "Обзор",
+      club: "Клуб",
       wallet: "Кошелёк",
       cadescaMenu: "Cadesca Menu",
       travel: "Поездки",
@@ -1945,6 +1948,7 @@ export const translations = {
     common: {
       home: "Ana sayfa",
       explore: "Keşfet",
+      club: "Kulüp",
       wallet: "Cüzdan",
       cadescaMenu: "Cadesca Menü",
       travel: "Seyahat",
