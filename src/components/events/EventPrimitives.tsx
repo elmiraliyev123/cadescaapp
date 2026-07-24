@@ -210,10 +210,10 @@ type ClubNavId = "overview" | "events" | "finance" | "scanner";
 export function ClubEventNav({ current, visible }: { current: ClubNavId; visible?: readonly ClubNavId[] }) {
   const { copy } = useEventsI18n();
   const items = [
-    { id: "overview" as const, href: "/app/club", label: copy.overview, icon: "dashboard" },
-    { id: "events" as const, href: "/app/club/events", label: copy.clubEvents, icon: "event" },
-    { id: "finance" as const, href: "/app/club/finance", label: copy.finance, icon: "payments" },
-    { id: "scanner" as const, href: "/app/club/scanner", label: copy.scanner, icon: "qr_code_scanner" }
+    { id: "overview" as const, href: "/dashboard", label: copy.overview, icon: "dashboard" },
+    { id: "events" as const, href: "/dashboard/events", label: copy.clubEvents, icon: "event" },
+    { id: "finance" as const, href: "/dashboard/finance", label: copy.finance, icon: "payments" },
+    { id: "scanner" as const, href: "/dashboard/scanner", label: copy.scanner, icon: "qr_code_scanner" }
   ];
   return (
     <nav className="no-scrollbar mb-6 flex gap-2 overflow-x-auto pb-1" aria-label={copy.clubDashboard}>

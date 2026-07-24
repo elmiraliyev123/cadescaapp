@@ -195,7 +195,7 @@ export function ClubDashboardView({ dashboard }: { dashboard: ClubDashboardPrese
         eyebrow={dashboard.club.name}
         title={copy.clubDashboard}
         description={copy.clubDashboardDescription}
-        action={canManage ? <Link href="/app/club/events/new" className={eventPrimaryButton}><span>{copy.createEvent}</span></Link> : undefined}
+        action={canManage ? <Link href="/dashboard/events/new" className={eventPrimaryButton}><span>{copy.createEvent}</span></Link> : undefined}
       />
       <div className="mb-7 flex flex-wrap items-center gap-2">
         <EventStatusPill status={dashboard.club.status} />
@@ -216,13 +216,13 @@ export function ClubDashboardView({ dashboard }: { dashboard: ClubDashboardPrese
       <section className="mt-9">
         <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
           <h2 className="text-[22px] font-black">{copy.clubEvents}</h2>
-          <Link href="/app/club/events" className={eventSecondaryButton}><span>{copy.viewEvent}</span></Link>
+          <Link href="/dashboard/events" className={eventSecondaryButton}><span>{copy.viewEvent}</span></Link>
         </div>
         {dashboard.events.length ? (
           <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
-            {dashboard.events.slice(0, 3).map((event) => <EventCard key={event.id} event={event} href={`/app/club/events/${event.id}`} />)}
+            {dashboard.events.slice(0, 3).map((event) => <EventCard key={event.id} event={event} href={`/dashboard/events/${event.id}`} />)}
           </div>
-        ) : <EventEmptyState text={copy.noClubEvents} action={canManage ? <Link href="/app/club/events/new" className={eventPrimaryButton}><span>{copy.createEvent}</span></Link> : undefined} />}
+        ) : <EventEmptyState text={copy.noClubEvents} action={canManage ? <Link href="/dashboard/events/new" className={eventPrimaryButton}><span>{copy.createEvent}</span></Link> : undefined} />}
       </section>
 
       {dashboard.roles.includes("club_owner") ? <section className="mt-9">
@@ -284,12 +284,12 @@ export function ClubEventsListView({ clubName, roles, events }: { clubName: stri
   return (
     <EventsFrame>
       <ClubEventNav current="events" visible={visibleClubNavigation(roles)} />
-      <EventsHeader eyebrow={clubName} title={copy.clubEvents} action={canManage ? <Link href="/app/club/events/new" className={eventPrimaryButton}><span>{copy.createEvent}</span></Link> : undefined} />
+      <EventsHeader eyebrow={clubName} title={copy.clubEvents} action={canManage ? <Link href="/dashboard/events/new" className={eventPrimaryButton}><span>{copy.createEvent}</span></Link> : undefined} />
       {events.length ? (
         <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
-          {events.map((event) => <EventCard key={event.id} event={event} href={`/app/club/events/${event.id}`} />)}
+          {events.map((event) => <EventCard key={event.id} event={event} href={`/dashboard/events/${event.id}`} />)}
         </div>
-      ) : <EventEmptyState text={copy.noClubEvents} action={canManage ? <Link href="/app/club/events/new" className={eventPrimaryButton}><span>{copy.createEvent}</span></Link> : undefined} />}
+      ) : <EventEmptyState text={copy.noClubEvents} action={canManage ? <Link href="/dashboard/events/new" className={eventPrimaryButton}><span>{copy.createEvent}</span></Link> : undefined} />}
     </EventsFrame>
   );
 }
@@ -439,8 +439,8 @@ export function ClubEventForm({
         {state.message ? <p className={cn("mt-5 rounded-xl px-3 py-2 text-[13px] font-bold", state.ok ? "border border-black bg-[#ffd400] text-black" : "bg-black text-white")} role={state.ok ? "status" : "alert"}>{state.ok ? copy.draftSaved : errorLabel(state.message)}</p> : null}
         <div className="mt-6 flex flex-wrap gap-3">
           <button type="submit" disabled={pending} className={eventPrimaryButton}><span>{pending ? copy.loading : copy.saveDraft}</span></button>
-          {state.ok && state.eventId ? <Link href={`/app/club/events/${state.eventId}`} className={eventSecondaryButton}><span>{copy.viewEvent}</span></Link> : null}
-          <Link href="/app/club/events" className={eventSecondaryButton}><span>{copy.clubEvents}</span></Link>
+          {state.ok && state.eventId ? <Link href={`/dashboard/events/${state.eventId}`} className={eventSecondaryButton}><span>{copy.viewEvent}</span></Link> : null}
+          <Link href="/dashboard/events" className={eventSecondaryButton}><span>{copy.clubEvents}</span></Link>
         </div>
       </form>
     </EventsFrame>
@@ -463,7 +463,7 @@ export function ClubEventManageView({ workspace, event, operations }: { workspac
         eyebrow={workspace.clubName}
         title={event.title}
         description={`${formatDateTime(event.startAt)} · ${event.location}`}
-        action={<>{canEdit ? <Link href={`/app/club/events/${event.id}/edit`} className={eventSecondaryButton}><span>{copy.edit}</span></Link> : null}{event.status === "published" || event.status === "sold_out" ? <Link href={`/event/${event.slug}`} className={eventPrimaryButton}><span>{copy.viewEvent}</span></Link> : null}</>}
+        action={<>{canEdit ? <Link href={`/dashboard/events/${event.id}/edit`} className={eventSecondaryButton}><span>{copy.edit}</span></Link> : null}{event.status === "published" || event.status === "sold_out" ? <Link href={`/event/${event.slug}`} className={eventPrimaryButton}><span>{copy.viewEvent}</span></Link> : null}</>}
       />
       <div className="mb-6 flex flex-wrap gap-2"><EventStatusPill status={event.status} /><EventStatusPill status={event.featuredStatus} /></div>
       <div className="grid gap-4 sm:grid-cols-3">
@@ -691,7 +691,7 @@ export function ScannerEventListView({ events }: { events: ScannerAssignedEvent[
         <article key={event.id} className="rounded-2xl border-2 border-black bg-white p-5 shadow-[4px_4px_0_#ffd400]">
           <div className="flex flex-wrap items-start justify-between gap-3"><div><p className="text-[11px] font-black uppercase tracking-[0.08em] text-black/50">{event.clubName}</p><h2 className="mt-1 text-[20px] font-black">{event.title}</h2></div><EventStatusPill status={event.status} /></div>
           <p className="mt-4 text-[13px] font-bold text-black/65">{formatDateTime(event.startAt)} · {event.location}</p>
-          <div className="mt-4 flex items-center justify-between gap-3 border-t border-black/10 pt-4"><p className="text-[13px] font-bold">{event.checkedInCount}/{event.approvedCount} {copy.checkedIn}</p><Link href={`/app/club/scanner/${event.id}`} className={eventPrimaryButton}><span>{copy.openScanner}</span></Link></div>
+          <div className="mt-4 flex items-center justify-between gap-3 border-t border-black/10 pt-4"><p className="text-[13px] font-bold">{event.checkedInCount}/{event.approvedCount} {copy.checkedIn}</p><Link href={`/dashboard/scanner/${event.id}`} className={eventPrimaryButton}><span>{copy.openScanner}</span></Link></div>
         </article>
       ))}</div> : <EventEmptyState text={copy.noScannerEvents} />}
     </EventsFrame>

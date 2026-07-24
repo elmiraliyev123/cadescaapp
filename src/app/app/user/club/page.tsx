@@ -1,27 +1,18 @@
 import { redirect } from "next/navigation";
 
-import { ClubGatewayPanel } from "@/components/clubs/ClubGatewayPanel";
-import { getStudentClubUrl } from "@/lib/appConfig";
+import { getAuthUrl, getStudentClubUrl } from "@/lib/appConfig";
 import { getCurrentStudentContext } from "@/lib/server/social";
-import {
-  getCurrentClubApplication,
-  hasCurrentActiveClubMembership,
-  listCurrentClubMembershipInvitations
-} from "@/lib/server/studentClubs";
+import { hasCurrentActiveClubMembership } from "@/lib/server/studentClubs";
 
 export const dynamic = "force-dynamic";
 
 export default async function ClubGatewayPage() {
   const user = await getCurrentStudentContext();
-  if (!user) redirect("/login?next=/app/user/club");
-  const [application, invitations, hasActiveMembership] = await Promise.all([
-    getCurrentClubApplication(),
-    listCurrentClubMembershipInvitations(),
-    hasCurrentActiveClubMembership()
-  ]);
-  if (hasActiveMembership && !invitations.length) {
-    redirect("/app/club");
+  const studentClubUrl = getStudentClubUrl();
+  if (!user) {
+    const authUrl = new URL("/login", getAuthUrl());
+    authUrl.searchParams.set("next", `${studentClubUrl}/application`);
+    redirect(authUrl.toString());
   }
-
-  return <ClubGatewayPanel application={application} invitations={invitations} applyHref={getStudentClubUrl()} />;
+  redirect(`${studentClubUrl}${await hasCurrentActiveClubMembership() ? "/dashboard" : "/waiting-approval"}`);
 }

@@ -75,22 +75,6 @@ export function ClubApplicationUpdateForm({ application }: { application: ClubAp
           <input name="clubName" defaultValue={application.name} required minLength={2} maxLength={140} className={fieldClass} />
         </label>
         <label>
-          <span className={labelClass}>{copy("clubSlug")}</span>
-          <input name="preferredSlug" defaultValue={application.slug} required minLength={3} maxLength={80} className={fieldClass} />
-        </label>
-        <label>
-          <span className={labelClass}>{copy("instagram")}</span>
-          <input name="instagramUrl" type="url" defaultValue={application.instagramUrl || ""} required className={fieldClass} />
-        </label>
-        <label>
-          <span className={labelClass}>{copy("website")}</span>
-          <input name="websiteUrl" type="url" defaultValue={application.websiteUrl || ""} required className={fieldClass} />
-        </label>
-        <label className="sm:col-span-2">
-          <span className={labelClass}>{copy("universityPage")}</span>
-          <input name="universityPageUrl" type="url" defaultValue={application.universityPageUrl || ""} className={fieldClass} />
-        </label>
-        <label>
           <span className={labelClass}>{copy("contactPhone")}</span>
           <input name="contactPhone" type="tel" defaultValue={application.contactPhone || ""} maxLength={40} className={fieldClass} />
         </label>
@@ -109,10 +93,6 @@ export function ClubApplicationUpdateForm({ application }: { application: ClubAp
             <label className="text-sm text-[#696969]">
               <span className="mb-2 block">{copy("logo")}</span>
               <input name="logo" type="file" accept="image/jpeg,image/png,image/webp" className="block w-full text-sm" />
-            </label>
-            <label className="text-sm text-[#696969]">
-              <span className="mb-2 block">{copy("recognitionDocument")}</span>
-              <input name="recognitionDocument" type="file" accept="application/pdf,image/jpeg,image/png" className="block w-full text-sm" />
             </label>
           </div>
         </div>

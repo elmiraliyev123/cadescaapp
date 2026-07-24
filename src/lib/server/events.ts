@@ -1007,21 +1007,39 @@ export async function listAssignedScannerEvents(clubId?: string): Promise<Scanne
             count(ticket.id) filter (where ticket.ticket_status in ('active', 'checked_in'))::int as approved_count
        from public.events event
        join public.student_clubs club on club.id = event.club_id
-       join public.event_scanner_assignments assignment
-         on assignment.event_id = event.id
-        and assignment.user_id = $1
-        and assignment.revoked_at is null
-       join public.club_memberships membership
-         on membership.club_id = event.club_id
-        and membership.user_id = $1
-        and membership.role = 'door_scanner'
-        and membership.status = 'active'
        left join public.event_tickets ticket on ticket.event_id = event.id
       where club.status = 'approved'
         and event.status in ('published', 'sold_out')
         and ($2::uuid is null or event.club_id = $2::uuid)
         and event.start_at <= now() + interval '6 hours'
         and event.end_at >= now() - interval '2 hours'
+        and (
+          exists (
+            select 1
+              from public.club_memberships owner_membership
+             where owner_membership.club_id = event.club_id
+               and owner_membership.user_id = $1
+               and owner_membership.role = 'club_owner'
+               and owner_membership.status = 'active'
+          )
+          or (
+            exists (
+              select 1
+                from public.club_memberships scanner_membership
+               where scanner_membership.club_id = event.club_id
+                 and scanner_membership.user_id = $1
+                 and scanner_membership.role = 'door_scanner'
+                 and scanner_membership.status = 'active'
+            )
+            and exists (
+              select 1
+                from public.event_scanner_assignments assignment
+               where assignment.event_id = event.id
+                 and assignment.user_id = $1
+                 and assignment.revoked_at is null
+            )
+          )
+        )
       group by event.id, club.name
       order by event.start_at asc`,
     [user.id, clubId || null]

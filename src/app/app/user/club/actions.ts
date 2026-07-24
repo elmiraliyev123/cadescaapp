@@ -29,5 +29,5 @@ export async function acceptClubInvitationAction(
   }
   revalidatePath("/app/user/club");
   revalidatePath("/app/club");
-  redirect("/app/club");
+  redirect("/dashboard");
 }

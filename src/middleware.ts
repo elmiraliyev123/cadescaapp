@@ -322,6 +322,16 @@ function isStudentClubRoute(pathname: string) {
   return pathname === "/student-club" || pathname.startsWith("/student-club/");
 }
 
+function isClubWorkspacePath(pathname: string) {
+  return pathname === "/app/club" || pathname.startsWith("/app/club/");
+}
+
+function clubWorkspacePath(pathname: string) {
+  if (pathname === "/dashboard") return "/app/club";
+  if (pathname.startsWith("/dashboard/")) return `/app/club${pathname.slice("/dashboard".length)}`;
+  return null;
+}
+
 function hasSupabaseAuthCookie(request: NextRequest) {
   return request.cookies.getAll().some((cookie) => cookie.name.startsWith("sb-") && cookie.name.includes("auth-token"));
 }
@@ -343,6 +353,34 @@ function authLoginRedirect(request: NextRequest) {
   const url = new URL("/login", authOrigin(request));
   url.searchParams.set("next", `${appOrigin(request)}/app/user/home`);
   return redirectAbsolute(url.toString());
+}
+
+function studentClubLoginRedirect(request: NextRequest, pathname: "/application" | "/dashboard" | "/waiting-approval") {
+  const url = new URL("/login", authOrigin(request));
+  url.searchParams.set("next", `${studentClubOrigin(request)}${pathname}`);
+  return redirectAbsolute(url.toString());
+}
+
+function safePortalDestination(request: NextRequest) {
+  const next = request.nextUrl.searchParams.get("next");
+  if (!next) return null;
+
+  try {
+    const destination = new URL(next);
+    const portalOrigin = new URL(studentClubOrigin(request)).origin;
+    if (
+      destination.origin === portalOrigin &&
+      (destination.pathname === "/application" ||
+        destination.pathname === "/dashboard" ||
+        destination.pathname === "/waiting-approval")
+    ) {
+      return destination.toString();
+    }
+  } catch {
+    // Fall through to the regular app home.
+  }
+
+  return null;
 }
 
 async function finalizeResponse(request: NextRequest, response: NextResponse) {
@@ -421,15 +459,14 @@ export async function middleware(request: NextRequest) {
     if (pathname === "/") {
       return finalizeResponse(
         request,
-        applyLocaleToResponse(redirectTo(request, "/student-club"), localeResolution)
+        applyLocaleToResponse(redirectTo(request, "/application"), localeResolution)
       );
     }
 
-    if (pathname.startsWith("/app/")) {
-      const target = new URL(`${pathname}${request.nextUrl.search}`, appOrigin(request));
+    if (pathname === "/student-club" || pathname.startsWith("/student-club/")) {
       return finalizeResponse(
         request,
-        applyLocaleToResponse(redirectAbsolute(target.toString()), localeResolution)
+        applyLocaleToResponse(redirectTo(request, "/application"), localeResolution)
       );
     }
 
@@ -441,15 +478,55 @@ export async function middleware(request: NextRequest) {
       );
     }
 
-    if (
-      !isStudentClubRoute(pathname) &&
-      !isPublicProfilePath(pathname) &&
-      !isPublicPostPath(pathname) &&
-      !isPublicMediaPath(pathname)
-    ) {
+    if (pathname === "/application") {
+      if (!(await hasStudentSession(request))) {
+        return finalizeResponse(
+          request,
+          applyLocaleToResponse(studentClubLoginRedirect(request, "/application"), localeResolution)
+        );
+      }
+      const rewrite = request.nextUrl.clone();
+      rewrite.pathname = "/student-club";
+      return finalizeResponse(request, applyLocaleToResponse(NextResponse.rewrite(rewrite), localeResolution));
+    }
+
+    if (pathname === "/waiting-approval") {
+      if (!(await hasStudentSession(request))) {
+        return finalizeResponse(
+          request,
+          applyLocaleToResponse(studentClubLoginRedirect(request, "/waiting-approval"), localeResolution)
+        );
+      }
+      const rewrite = request.nextUrl.clone();
+      rewrite.pathname = "/student-club/status";
+      return finalizeResponse(request, applyLocaleToResponse(NextResponse.rewrite(rewrite), localeResolution));
+    }
+
+    const workspacePath = clubWorkspacePath(pathname);
+    if (workspacePath) {
+      if (!(await hasStudentSession(request))) {
+        return finalizeResponse(
+          request,
+          applyLocaleToResponse(studentClubLoginRedirect(request, "/dashboard"), localeResolution)
+        );
+      }
+      const rewrite = request.nextUrl.clone();
+      rewrite.pathname = workspacePath;
+      return finalizeResponse(request, applyLocaleToResponse(NextResponse.rewrite(rewrite), localeResolution));
+    }
+
+    if (isClubWorkspacePath(pathname)) {
+      const suffix = pathname.slice("/app/club".length);
       return finalizeResponse(
         request,
-        applyLocaleToResponse(redirectTo(request, "/student-club"), localeResolution)
+        applyLocaleToResponse(redirectTo(request, `/dashboard${suffix}`), localeResolution)
+      );
+    }
+
+    if (!isPublicProfilePath(pathname) && !isPublicPostPath(pathname) && !isPublicMediaPath(pathname)) {
+      return finalizeResponse(
+        request,
+        applyLocaleToResponse(redirectTo(request, "/application"), localeResolution)
       );
     }
   } else if (
@@ -514,9 +591,10 @@ export async function middleware(request: NextRequest) {
     const authenticated = await hasStudentSession(request);
 
     if ((pathname === "/login" || pathname === "/signup" || pathname === "/verify-email") && authenticated) {
+      const destination = safePortalDestination(request);
       return finalizeResponse(
         request,
-        applyLocaleToResponse(redirectAbsolute(`${appOrigin(request)}/app/user/home`), localeResolution)
+        applyLocaleToResponse(redirectAbsolute(destination || `${appOrigin(request)}/app/user/home`), localeResolution)
       );
     }
 
@@ -544,6 +622,17 @@ export async function middleware(request: NextRequest) {
   if (host === "app.cadesca.com" || host === "cadesca-app.vercel.app") {
     if (isAuthRoute(pathname)) {
       const target = new URL(`${pathname}${request.nextUrl.search}`, authOrigin(request));
+      return finalizeResponse(request, applyLocaleToResponse(redirectAbsolute(target.toString()), localeResolution));
+    }
+
+    if (isClubWorkspacePath(pathname)) {
+      const suffix = pathname.slice("/app/club".length);
+      const target = new URL(`/dashboard${suffix}${request.nextUrl.search}`, studentClubOrigin(request));
+      return finalizeResponse(request, applyLocaleToResponse(redirectAbsolute(target.toString()), localeResolution));
+    }
+
+    if (pathname === "/app/user/club" || pathname.startsWith("/app/user/club/")) {
+      const target = new URL("/application", studentClubOrigin(request));
       return finalizeResponse(request, applyLocaleToResponse(redirectAbsolute(target.toString()), localeResolution));
     }
 

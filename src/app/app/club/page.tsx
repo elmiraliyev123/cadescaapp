@@ -40,7 +40,7 @@ export default async function ClubDashboardPage() {
       }
     }} />;
   }
-  if (canManageClubFinance(dashboard.roles)) redirect("/app/club/finance");
-  if (canScanClubEvents(dashboard.roles)) redirect("/app/club/scanner");
+  if (canManageClubFinance(dashboard.roles)) redirect("/dashboard/finance");
+  if (canScanClubEvents(dashboard.roles)) redirect("/dashboard/scanner");
   return <EventsRouteError error="club_access_denied" />;
 }

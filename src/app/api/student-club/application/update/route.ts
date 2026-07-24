@@ -29,15 +29,10 @@ function optionalFile(formData: FormData, key: string) {
 function applicationInput(formData: FormData): ClubApplicationUpdateInput {
   return {
     clubName: text(formData, "clubName"),
-    preferredSlug: text(formData, "preferredSlug"),
     description: text(formData, "description"),
-    instagramUrl: text(formData, "instagramUrl"),
-    websiteUrl: text(formData, "websiteUrl"),
-    universityPageUrl: text(formData, "universityPageUrl") || null,
     contactPhone: text(formData, "contactPhone") || null,
     additionalNote: text(formData, "additionalNote") || null,
-    logo: optionalFile(formData, "logo"),
-    recognitionDocument: optionalFile(formData, "recognitionDocument")
+    logo: optionalFile(formData, "logo")
   };
 }
 

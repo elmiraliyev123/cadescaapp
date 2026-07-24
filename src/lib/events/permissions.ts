@@ -9,5 +9,5 @@ export function canManageClubFinance(roles: readonly ClubRole[]) {
 }
 
 export function canScanClubEvents(roles: readonly ClubRole[]) {
-  return roles.includes("door_scanner");
+  return roles.includes("club_owner") || roles.includes("door_scanner");
 }

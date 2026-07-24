@@ -1,5 +1,11 @@
-import { UserShell } from "@/components/app/UserShell";
+import { redirect } from "next/navigation";
 
-export default function ClubLayout({ children }: { children: React.ReactNode }) {
-  return <UserShell>{children}</UserShell>;
+import { hasCurrentActiveClubMembership } from "@/lib/server/studentClubs";
+
+export default async function ClubLayout({ children }: { children: React.ReactNode }) {
+  if (!(await hasCurrentActiveClubMembership())) {
+    redirect("/waiting-approval");
+  }
+
+  return children;
 }

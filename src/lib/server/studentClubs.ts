@@ -120,19 +120,25 @@ export type ClubApplicationInput = {
   agreementAccepted: boolean;
 };
 
+export type AuthenticatedClubApplicationInput = {
+  universityId: string;
+  clubName: string;
+  officialEmail: string;
+  description: string;
+  logo: File;
+  contactPhone?: string | null;
+  additionalNote?: string | null;
+  agreementAccepted: boolean;
+};
+
 export type ClubReviewDecision = "approve" | "reject" | "request_clarification";
 
 export type ClubApplicationUpdateInput = {
   clubName: string;
-  preferredSlug: string;
   description: string;
-  instagramUrl: string;
-  websiteUrl: string;
-  universityPageUrl?: string | null;
   contactPhone?: string | null;
   additionalNote?: string | null;
   logo?: File | null;
-  recognitionDocument?: File | null;
 };
 
 export type ApprovedClubProfileInput = {
@@ -478,33 +484,19 @@ async function validateApplication(input: ClubApplicationInput): Promise<Validat
 function validateEditableApplication(input: ClubApplicationUpdateInput) {
   const clubName = input.clubName.trim();
   const description = input.description.trim();
-  const clubSlug = normalizeClubSlug(input.preferredSlug);
   const contactPhone = input.contactPhone?.trim() || null;
   const additionalNote = input.additionalNote?.trim() || null;
   if (
     !fieldLength(clubName, 2, 140) ||
     !fieldLength(description, 20, 2_000) ||
-    clubSlug.length < 3 ||
-    CLUB_SLUG_RESERVED.has(clubSlug) ||
     (contactPhone !== null && !/^[+0-9() .-]{6,40}$/.test(contactPhone)) ||
     (additionalNote !== null && additionalNote.length > 1_000)
   ) {
     throw new StudentClubError("application_invalid", 422);
   }
-  const websiteUrl = normalizeHttpUrl(input.websiteUrl, true)!;
-  const instagramUrl = normalizeHttpUrl(input.instagramUrl, true)!;
-  const universityPageUrl = normalizeHttpUrl(input.universityPageUrl || "", false);
-  const instagramHost = new URL(instagramUrl).hostname.toLowerCase();
-  if (instagramHost !== "instagram.com" && !instagramHost.endsWith(".instagram.com")) {
-    throw new StudentClubError("application_invalid", 422);
-  }
   return {
     clubName,
-    clubSlug,
     description,
-    websiteUrl,
-    instagramUrl,
-    universityPageUrl,
     contactPhone,
     additionalNote
   };
@@ -924,6 +916,132 @@ export async function submitClubApplication(input: ClubApplicationInput & { otp:
   }
 }
 
+/**
+ * Creates a pending application for the Cadesca user already authenticated on
+ * the shared Cadesca session. Student Club never creates or signs in a second
+ * account of its own.
+ */
+export async function submitAuthenticatedClubApplication(input: AuthenticatedClubApplicationInput) {
+  const representative = await getCurrentStudentContext();
+  if (!representative || representative.status !== "active" || representative.id === "user_mock") {
+    throw new StudentClubError("authentication_required", 401);
+  }
+
+  const university = await activeUniversityById(input.universityId);
+  const clubName = input.clubName.trim();
+  const description = input.description.trim();
+  const officialEmail = normalizeEmail(input.officialEmail);
+  const contactPhone = input.contactPhone?.trim() || null;
+  const additionalNote = input.additionalNote?.trim() || null;
+  const clubSlug = normalizeClubSlug(clubName);
+
+  if (
+    !university ||
+    !input.agreementAccepted ||
+    !fieldLength(clubName, 2, 140) ||
+    !fieldLength(description, 20, 2_000) ||
+    clubSlug.length < 3 ||
+    CLUB_SLUG_RESERVED.has(clubSlug) ||
+    !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(officialEmail) ||
+    (contactPhone !== null && !/^[+0-9() .-]{6,40}$/.test(contactPhone)) ||
+    (additionalNote !== null && additionalNote.length > 1_000)
+  ) {
+    throw new StudentClubError("application_invalid", 422);
+  }
+
+  const logoExtension = await validateLogo(input.logo);
+  await moderateClubLogo(input.logo);
+
+  const clubId = randomUUID();
+  const logoPath = `clubs/${clubId}/logo/${randomUUID()}.${logoExtension}`;
+  const storage = getSupabaseAdminClient().storage;
+  const { error: uploadError } = await storage.from(CLUB_LOGO_BUCKET).upload(logoPath, input.logo, {
+    cacheControl: "31536000",
+    contentType: logoExtension === "jpg" ? "image/jpeg" : `image/${logoExtension}`,
+    upsert: false
+  });
+  if (uploadError) throw new StudentClubError("upload_failed", 502);
+
+  try {
+    const pool = await getReadyPool();
+    const client = await pool.connect();
+    try {
+      await client.query("BEGIN");
+      await client.query(`SELECT pg_advisory_xact_lock(hashtextextended($1, 0))`, [representative.id]);
+
+      const duplicate = await client.query<{ exists: boolean }>(
+        `SELECT EXISTS (
+           SELECT 1
+             FROM public.club_memberships membership
+             JOIN public.student_clubs club ON club.id = membership.club_id
+            WHERE membership.user_id = $1
+              AND club.status IN ('pending_review', 'clarification_requested', 'approved', 'suspended')
+         ) AS exists`,
+        [representative.id]
+      );
+      if (duplicate.rows[0]?.exists) throw new StudentClubError("application_conflict", 409);
+
+      await client.query(
+        `INSERT INTO public.student_clubs (
+           id, university_id, name, slug, description, logo_url,
+           official_email, contact_email, website_url, instagram_url,
+           university_page_url, verification_document_url, contact_phone,
+           additional_note, status, created_at, updated_at
+         )
+         VALUES (
+           $1::uuid, $2::uuid, $3, $4, $5, $6,
+           $7, $8, NULL, NULL, NULL, '', $9, $10,
+           'pending_review', now(), now()
+         )`,
+        [
+          clubId,
+          university.id,
+          clubName,
+          clubSlug,
+          description,
+          logoPath,
+          officialEmail,
+          normalizeEmail(representative.email),
+          contactPhone,
+          additionalNote
+        ]
+      );
+
+      await client.query(
+        `INSERT INTO public.club_memberships (
+           id, club_id, user_id, role, status, invited_at, created_at, updated_at
+         ) VALUES ($1::uuid, $2::uuid, $3, 'club_owner', 'invited', now(), now(), now())`,
+        [randomUUID(), clubId, representative.id]
+      );
+
+      await client.query(
+        `INSERT INTO public.event_audit_logs (
+           university_id, club_id, actor_user_id, action, metadata, created_at
+         ) VALUES ($1::uuid, $2::uuid, $3, 'club_application_submitted', $4::jsonb, now())`,
+        [university.id, clubId, representative.id, JSON.stringify({ rulesAccepted: true, authentication: "cadesca" })]
+      );
+
+      await client.query("COMMIT");
+      return { clubId, status: "pending_review" as const };
+    } catch (error) {
+      await client.query("ROLLBACK").catch(() => undefined);
+      throw error;
+    } finally {
+      client.release();
+    }
+  } catch (error) {
+    await storage.from(CLUB_LOGO_BUCKET).remove([logoPath]).catch(() => undefined);
+    if (error instanceof StudentClubError) throw error;
+    const pgCode = typeof error === "object" && error !== null && "code" in error ? String(error.code) : "";
+    if (pgCode === "23505") throw new StudentClubError("application_conflict", 409);
+    console.error("[student_clubs] authenticated_application_failed", {
+      reason: error instanceof Error ? error.name : "unknown",
+      code: pgCode || undefined
+    });
+    throw new StudentClubError("application_invalid", 500);
+  }
+}
+
 const CLUB_APPLICATION_SELECT = `
   SELECT
     club.id,
@@ -1288,7 +1406,7 @@ export async function updateCurrentClubApplication(input: ClubApplicationUpdateI
   const replacements = await uploadClubApplicationReplacements({
     clubId: application.id,
     logo: input.logo,
-    recognitionDocument: input.recognitionDocument
+    recognitionDocument: null
   });
   const pool = await getReadyPool();
   const client = await pool.connect();
@@ -1298,18 +1416,13 @@ export async function updateCurrentClubApplication(input: ClubApplicationUpdateI
     const updated = await client.query(
       `UPDATE public.student_clubs club
           SET name = $3,
-              slug = $4,
-              description = $5,
-              website_url = $6,
-              instagram_url = $7,
-              university_page_url = $8,
-              contact_phone = $9,
-              additional_note = $10,
-              logo_url = COALESCE($11, logo_url),
-              verification_document_url = COALESCE($12, verification_document_url),
+              description = $4,
+              contact_phone = $5,
+              additional_note = $6,
+              logo_url = COALESCE($7, logo_url),
               updated_at = now()
         WHERE club.id = $1::uuid
-          AND club.updated_at = $13::timestamptz
+          AND club.updated_at = $8::timestamptz
           AND club.status IN ('pending_review', 'clarification_requested')
           AND EXISTS (
             SELECT 1
@@ -1324,25 +1437,19 @@ export async function updateCurrentClubApplication(input: ClubApplicationUpdateI
         application.id,
         user.id,
         fields.clubName,
-        fields.clubSlug,
         fields.description,
-        fields.websiteUrl,
-        fields.instagramUrl,
-        fields.universityPageUrl,
         fields.contactPhone,
         fields.additionalNote,
         replacements.logoPath,
-        replacements.documentPath,
         application.updated_at
       ]
     );
     if (!updated.rows[0]) throw new StudentClubError("review_conflict", 409);
 
     const changedFields = [
-      "name", "slug", "description", "website_url", "instagram_url",
-      "university_page_url", "contact_phone", "additional_note",
-      ...(replacements.logoPath ? ["logo_url"] : []),
-      ...(replacements.documentPath ? ["verification_document_url"] : [])
+      "name", "description",
+      "contact_phone", "additional_note",
+      ...(replacements.logoPath ? ["logo_url"] : [])
     ];
     await client.query(
       `INSERT INTO public.event_audit_logs (

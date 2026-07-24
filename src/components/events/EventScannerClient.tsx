@@ -283,7 +283,7 @@ export function EventScannerClient({ event }: { event: ScannerAssignedEvent }) {
         eyebrow={event.clubName}
         title={event.title}
         description={`${formatDateTime(event.startAt)} · ${event.location}`}
-        action={<Link href="/app/club/scanner" className={eventSecondaryButton}><span>{copy.scannerEvents}</span></Link>}
+        action={<Link href="/dashboard/scanner" className={eventSecondaryButton}><span>{copy.scannerEvents}</span></Link>}
       />
 
       <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_360px]">

@@ -20,7 +20,7 @@ export function ClubApplicationScreen({ universities }: { universities: Universi
         <div className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-5 py-4 sm:px-8">
           <Logo maxWidth={132} />
           <div className="flex items-center gap-3">
-            <Link href="/student-club/status" className="hidden text-sm font-semibold text-[#0A0A0A] hover:underline sm:inline">
+            <Link href="/waiting-approval" className="hidden text-sm font-semibold text-[#0A0A0A] hover:underline sm:inline">
               {copy("viewStatus")}
             </Link>
             <LanguageSwitcher />

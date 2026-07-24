@@ -139,7 +139,7 @@ export function ClubGatewayPanel({ application, invitations, applyHref }: {
           </Link>
         ) : null}
         {application.status === "approved" ? (
-          <Link href="/app/club" className="mt-5 inline-flex h-11 items-center justify-center rounded-lg bg-primary px-5 text-sm font-semibold text-on-primary">
+          <Link href="/dashboard" className="mt-5 inline-flex h-11 items-center justify-center rounded-lg bg-primary px-5 text-sm font-semibold text-on-primary">
             {copy("dashboard")}
           </Link>
         ) : null}

@@ -106,20 +106,38 @@ async function scannerContext(
     `select event.id, event.title, event.status, event.club_id, event.university_id
        from public.events event
        join public.student_clubs club on club.id = event.club_id
-       join public.event_scanner_assignments assignment
-         on assignment.event_id = event.id
-        and assignment.user_id = $2
-        and assignment.revoked_at is null
-       join public.club_memberships membership
-         on membership.club_id = event.club_id
-        and membership.user_id = $2
-        and membership.role = 'door_scanner'
-        and membership.status = 'active'
        join public.users scanner
-         on scanner.id = assignment.user_id
+         on scanner.id = $2
         and scanner.status = 'active'
       where event.id = $1::uuid
         and club.status = 'approved'
+        and (
+          exists (
+            select 1
+              from public.club_memberships owner_membership
+             where owner_membership.club_id = event.club_id
+               and owner_membership.user_id = $2
+               and owner_membership.role = 'club_owner'
+               and owner_membership.status = 'active'
+          )
+          or (
+            exists (
+              select 1
+                from public.club_memberships scanner_membership
+               where scanner_membership.club_id = event.club_id
+                 and scanner_membership.user_id = $2
+                 and scanner_membership.role = 'door_scanner'
+                 and scanner_membership.status = 'active'
+            )
+            and exists (
+              select 1
+                from public.event_scanner_assignments assignment
+               where assignment.event_id = event.id
+                 and assignment.user_id = $2
+                 and assignment.revoked_at is null
+            )
+          )
+        )
         and (
           (
             event.status in ('published', 'sold_out')

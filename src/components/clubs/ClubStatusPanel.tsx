@@ -7,7 +7,6 @@ import { LanguageSwitcher } from "@/components/ui/LanguageSwitcher";
 import { Logo } from "@/components/ui/Logo";
 import { clubCopy } from "@/lib/clubs/localization";
 import { useLanguage } from "@/lib/i18n";
-import { ClubApplicationUpdateForm } from "@/components/clubs/ClubApplicationUpdateForm";
 
 const STATUS_BODY = {
   pending_review: "pendingBody",
@@ -63,7 +62,7 @@ export function ClubStatusPanel({
           <div className="mt-8 rounded-2xl border border-[#E4E1D8] bg-white p-8 text-center shadow-sm">
             <span className="material-symbols-outlined text-4xl text-[#696969]" aria-hidden="true">assignment</span>
             <p className="mt-4 text-sm font-medium text-[#696969]">{copy("noApplication")}</p>
-            <Link href="/student-club" className="mt-5 inline-flex h-11 items-center justify-center rounded-xl bg-[#FFD84D] px-5 text-sm font-semibold text-[#0A0A0A] hover:bg-[#F2C230]">
+            <Link href="/application" className="mt-5 inline-flex h-11 items-center justify-center rounded-xl bg-[#0A0A0A] px-5 text-sm font-semibold text-white hover:bg-[#252525]">
               {copy("newApplication")}
             </Link>
           </div>
@@ -101,10 +100,6 @@ export function ClubStatusPanel({
                   {application.clarificationMessage || application.rejectionReason || application.suspensionReason}
                 </p>
               </section>
-            ) : null}
-
-            {application.status === "pending_review" || application.status === "clarification_requested" ? (
-              <ClubApplicationUpdateForm application={application} />
             ) : null}
 
             <p className="rounded-xl bg-[#0A0A0A] p-5 text-sm leading-6 text-white/75">{copy("restrictedNotice")}</p>

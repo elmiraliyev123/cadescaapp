@@ -1,4 +1,4 @@
-import { getAppUrl, getAuthUrl } from "@/lib/appConfig";
+import { getAppUrl, getAuthUrl, getStudentClubUrl } from "@/lib/appConfig";
 
 function isLocalBrowser() {
   if (typeof window === "undefined") return false;
@@ -36,6 +36,14 @@ export function safePostAuthHref(next: string | null | undefined) {
     if (
       parsed.pathname.startsWith("/app/user/") &&
       (parsed.origin === appOrigin || (isLocalBrowser() && parsed.origin === localOrigin))
+    ) {
+      return isLocalBrowser() ? `${parsed.pathname}${parsed.search}` : parsed.toString();
+    }
+
+    const studentClubOrigin = new URL(getStudentClubUrl()).origin;
+    if (
+      ["/application", "/dashboard", "/waiting-approval"].includes(parsed.pathname) &&
+      (parsed.origin === studentClubOrigin || (isLocalBrowser() && parsed.origin === localOrigin))
     ) {
       return isLocalBrowser() ? `${parsed.pathname}${parsed.search}` : parsed.toString();
     }
