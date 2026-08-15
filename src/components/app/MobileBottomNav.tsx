@@ -70,8 +70,8 @@ export function MobileBottomNav({ navItems, currentPath }: { navItems: NavItem[]
                 ) : null}
               </span>
               <span className={cn(
-                "max-w-full whitespace-normal text-center font-medium [overflow-wrap:anywhere]",
-                compact ? "text-[10px] leading-[12px]" : "text-[11.5px] leading-[14px]"
+                "max-w-full whitespace-nowrap text-center font-medium tracking-[-0.025em]",
+                compact ? "text-[9px] leading-3" : "text-[9px] leading-3 min-[360px]:text-[10px] min-[390px]:text-[11px]"
               )}>
                 {t(item.i18nKey)}
               </span>

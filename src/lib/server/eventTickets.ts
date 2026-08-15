@@ -122,6 +122,22 @@ export async function reserveEventTicket(eventId: string, requestedMethod?: stri
     if (!ticketId) throw new EventTicketError("internal_server_error", 500);
     const ticket = await getCurrentUserTicket(ticketId);
     if (!ticket) throw new EventTicketError("ticket_not_found", 404);
+    await pool.query(
+      `insert into public.notifications (user_id, type, title, body, href, actor_type, actor_id, metadata)
+       select $1,
+              'event_reservation_confirmed',
+              'Event reservation confirmed',
+              event.title,
+              '/app/user/tickets/' || $2::text,
+              'club',
+              event.club_id::text,
+              jsonb_build_object('event_id', event.id::text, 'ticket_id', $2::text)
+         from public.events event
+        where event.id = $3::uuid`,
+      [user.id, ticketId, eventId]
+    ).catch((error) => {
+      console.warn("[event_tickets] reservation_notification_failed", { reason: error instanceof Error ? error.name : "unknown" });
+    });
     return ticket;
   } catch (error) {
     throw normalizeFunctionError(error);

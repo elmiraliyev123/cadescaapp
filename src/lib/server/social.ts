@@ -30,6 +30,7 @@ export type CurrentStudentContext = {
   legacyUniversityDomain: string | null;
   studentStatus: string;
   studentMenuAccess: boolean;
+  emailVerified: boolean;
   verifiedAt: string | null;
   verifiedVia: string;
   createdAt: string | null;
@@ -55,6 +56,8 @@ export type SocialPost = {
   authorName: string;
   authorUsername: string | null;
   authorAvatarUrl: string | null;
+  authorType: "user" | "club";
+  authorHref: string | null;
   universityName: string;
   universitySlug: string;
   body: string;
@@ -72,13 +75,16 @@ export type SocialPost = {
 
 export type SocialActivityItem = {
   id: string;
-  type: "like" | "comment" | "follow";
+  type: "like" | "comment" | "follow" | "system";
   actorName: string;
   actorUsername: string | null;
   actorAvatarUrl: string | null;
   postId: string;
   postPreview: string;
   commentBody: string | null;
+  headline?: string | null;
+  href?: string | null;
+  read?: boolean;
   createdAt: string;
 };
 
@@ -193,6 +199,7 @@ type CurrentStudentRow = {
   university_domain: string | null;
   student_status: string;
   student_menu_access: boolean;
+  email_verified: boolean;
   verified_at: Date | string | null;
   verified_via: string | null;
   created_at: Date | string | null;
@@ -213,6 +220,7 @@ type LegacyCurrentStudentRow = Omit<
   | "bio"
   | "avatar_url"
   | "public_profile_enabled"
+  | "email_verified"
 > & {
   university_id?: null;
   verified_at?: null;
@@ -224,6 +232,7 @@ type LegacyCurrentStudentRow = Omit<
   bio?: null;
   avatar_url?: null;
   public_profile_enabled?: true;
+  email_verified?: boolean;
 };
 
 type PostRow = {
@@ -244,6 +253,10 @@ type PostRow = {
   comment_count: number;
   report_count: number;
   liked_by_current_user: boolean;
+  actor_type: "user" | "club";
+  club_id: string | null;
+  club_slug: string | null;
+  club_logo_url: string | null;
 };
 
 type CommentRow = {
@@ -378,6 +391,7 @@ function mapCurrentStudent(row: CurrentStudentRow | LegacyCurrentStudentRow, soc
     legacyUniversityDomain: row.university_domain,
     studentStatus: row.student_status,
     studentMenuAccess: row.student_menu_access,
+    emailVerified: row.email_verified !== false,
     verifiedAt: iso(row.verified_at),
     verifiedVia: row.verified_via || "email",
     createdAt: iso(row.created_at),
@@ -433,6 +447,7 @@ export async function getCurrentStudentContext(): Promise<CurrentStudentContext 
       legacyUniversityDomain: "bilkent.edu.tr",
       studentStatus: "verified",
       studentMenuAccess: true,
+      emailVerified: true,
       verifiedAt: null,
       verifiedVia: "email",
       createdAt: null,
@@ -461,6 +476,7 @@ export async function getCurrentStudentContext(): Promise<CurrentStudentContext 
          app_user.university_domain,
          app_user.student_status,
          app_user.student_menu_access,
+         app_user.email_verified,
          app_user.verified_at,
          app_user.verified_via,
          app_user.created_at,
@@ -503,6 +519,7 @@ export async function getCurrentStudentContext(): Promise<CurrentStudentContext 
          app_user.university_domain,
          app_user.student_status,
          app_user.student_menu_access,
+         app_user.email_verified,
          app_user.verified_via,
          app_user.created_at
        from public.users app_user
@@ -665,6 +682,12 @@ function mapPost(
     authorName: row.author_name,
     authorUsername: row.author_username,
     authorAvatarUrl: row.author_avatar_url ? avatarUrls.get(row.author_avatar_url) || null : null,
+    authorType: row.actor_type,
+    authorHref: row.actor_type === "club" && row.club_slug
+      ? `/app/user/clubs/${encodeURIComponent(row.club_slug)}`
+      : row.author_username
+        ? `/user/${encodeURIComponent(row.author_username)}`
+        : null,
     universityName: row.university_name,
     universitySlug: row.university_slug,
     body: row.body,
@@ -676,7 +699,7 @@ function mapPost(
     commentCount: row.comment_count,
     reportCount: row.report_count,
     likedByCurrentUser: row.liked_by_current_user,
-    ownPost: row.user_id === currentUserId,
+    ownPost: row.actor_type === "user" && row.user_id === currentUserId,
     comments
   };
 }
@@ -694,9 +717,13 @@ export async function listUniversityFeed(user: CurrentStudentContext, limit = 50
        post.status,
        post.created_at,
        post.updated_at,
-       coalesce(author.display_name, author.name) as author_name,
-       author.username as author_username,
-       author.avatar_url as author_avatar_url,
+       post.actor_type,
+       post.club_id,
+       club.slug as club_slug,
+       club.logo_url as club_logo_url,
+       case when post.actor_type = 'club' then club.name else coalesce(author.display_name, author.name) end as author_name,
+       case when post.actor_type = 'club' then club.slug else author.username end as author_username,
+       case when post.actor_type = 'club' then null else author.avatar_url end as author_avatar_url,
        university.name as university_name,
        university.slug as university_slug,
        (select count(*)::int from public.university_post_likes like_row where like_row.post_id = post.id) as like_count,
@@ -711,6 +738,8 @@ export async function listUniversityFeed(user: CurrentStudentContext, limit = 50
      from public.university_posts post
      join public.users author
        on author.id = post.user_id
+     left join public.student_clubs club
+       on club.id = post.club_id
      join public.universities university
        on university.id = post.university_id
      where post.university_id = $1
@@ -731,7 +760,12 @@ export async function listUniversityFeed(user: CurrentStudentContext, limit = 50
   const comments = await loadCommentsForPosts(result.rows.map((row) => row.id), user.id);
   const avatarUrls = await resolveAvatarUrls(result.rows.map((row) => row.author_avatar_url));
   const imageUrls = await resolvePostImageUrls(result.rows.map((row) => row.image_url));
-  return result.rows.map((row) => mapPost(row, comments.get(row.id) || [], user.id, avatarUrls, imageUrls));
+  return result.rows.map((row) => {
+    const post = mapPost(row, comments.get(row.id) || [], user.id, avatarUrls, imageUrls);
+    return row.actor_type === "club" && row.club_id && row.club_logo_url
+      ? { ...post, authorAvatarUrl: `/media/club/${encodeURIComponent(row.club_id)}` }
+      : post;
+  });
 }
 
 export async function listExplorePosts(user: CurrentStudentContext, limit = 20) {
@@ -761,6 +795,10 @@ async function listUserPostsForViewer(
        post.status,
        post.created_at,
        post.updated_at,
+       post.actor_type,
+       post.club_id,
+       club.slug as club_slug,
+       club.logo_url as club_logo_url,
        coalesce(author.display_name, author.name) as author_name,
        author.username as author_username,
        author.avatar_url as author_avatar_url,
@@ -778,9 +816,12 @@ async function listUserPostsForViewer(
      from public.university_posts post
      join public.users author
        on author.id = post.user_id
+     left join public.student_clubs club
+       on club.id = post.club_id
      join public.universities university
        on university.id = post.university_id
      where post.user_id = $1
+       and post.actor_type = 'user'
        and post.university_id = $2
        and post.status = 'active'
      order by post.created_at desc
@@ -1329,7 +1370,7 @@ export async function listSocialActivity(user: CurrentStudentContext, limit = 40
   }
 
   const avatarUrls = await resolveAvatarUrls(rows.map((row) => row.actor_avatar_url));
-  return rows.map<SocialActivityItem>((row) => ({
+  const socialItems = rows.map<SocialActivityItem>((row) => ({
     id: row.id,
     type: row.type,
     actorName: row.actor_name,
@@ -1340,6 +1381,44 @@ export async function listSocialActivity(user: CurrentStudentContext, limit = 40
     commentBody: row.comment_body,
     createdAt: iso(row.created_at) || ""
   }));
+
+  try {
+    const notifications = await pool.query<{
+      id: string;
+      title: string;
+      body: string | null;
+      href: string | null;
+      read_at: Date | string | null;
+      created_at: Date | string;
+    }>(
+      `select id::text, title, body, href, read_at, created_at
+         from public.notifications
+        where user_id = $1
+        order by created_at desc
+        limit $2`,
+      [user.id, limit]
+    );
+    const systemItems = notifications.rows.map<SocialActivityItem>((row) => ({
+      id: `system:${row.id}`,
+      type: "system",
+      actorName: "Cadesca",
+      actorUsername: null,
+      actorAvatarUrl: null,
+      postId: "",
+      postPreview: row.body || "",
+      commentBody: null,
+      headline: row.title,
+      href: row.href,
+      read: Boolean(row.read_at),
+      createdAt: iso(row.created_at) || ""
+    }));
+    return [...socialItems, ...systemItems]
+      .sort((left, right) => new Date(right.createdAt).getTime() - new Date(left.createdAt).getTime())
+      .slice(0, limit);
+  } catch (error) {
+    if (!isMissingSocialSchemaError(error)) throw error;
+    return socialItems;
+  }
 }
 
 export async function listAdminModerationPosts(limit = 100) {

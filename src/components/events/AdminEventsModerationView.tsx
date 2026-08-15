@@ -4,6 +4,7 @@ import { useActionState } from "react";
 
 import {
   featureEventAction,
+  moderateEventAction,
   reviewEventAction,
   type AdminEventActionState
 } from "@/app/app/admin/events/actions";
@@ -51,6 +52,7 @@ function AdminEventCard({ event }: { event: EventDiscoveryItem }) {
   const feedback = feedbackCopy[language];
   const [reviewState, reviewFormAction, reviewPending] = useActionState(reviewEventAction, EMPTY_ACTION_STATE);
   const [featureState, featureFormAction, featurePending] = useActionState(featureEventAction, EMPTY_ACTION_STATE);
+  const [moderationState, moderationFormAction, moderationPending] = useActionState(moderateEventAction, EMPTY_ACTION_STATE);
 
   return (
     <article className="overflow-hidden rounded-2xl border-2 border-black bg-white shadow-[4px_4px_0_#ffd400]">
@@ -75,6 +77,9 @@ function AdminEventCard({ event }: { event: EventDiscoveryItem }) {
             <div className="flex flex-wrap gap-2">
               <EventStatusPill status={event.status} />
               <EventStatusPill status={event.featuredStatus} />
+              {event.moderationStatus === "platform_suspended" ? (
+                <span className="inline-flex min-h-7 items-center rounded-full border border-black bg-black px-2.5 py-1 text-[11px] font-extrabold text-white">Platform suspended</span>
+              ) : null}
             </div>
           </div>
           <p className="mt-3 line-clamp-3 text-[13px] leading-5 text-black/65">{event.description}</p>
@@ -130,6 +135,21 @@ function AdminEventCard({ event }: { event: EventDiscoveryItem }) {
               <ActionFeedback state={featureState} success={feedback.featureSaved} />
             </form>
           ) : null}
+
+          <form action={moderationFormAction} className="mt-4 rounded-xl border border-black bg-white p-3">
+            <input type="hidden" name="eventId" value={event.id} />
+            <input type="hidden" name="suspended" value={event.moderationStatus === "platform_suspended" ? "false" : "true"} />
+            {event.moderationStatus !== "platform_suspended" ? (
+              <label>
+                <span className="mb-1 block text-[11px] font-black uppercase">Platform enforcement reason</span>
+                <textarea name="reason" required minLength={2} maxLength={1000} rows={2} className={eventInput} />
+              </label>
+            ) : null}
+            <button type="submit" disabled={moderationPending} className={`${eventSecondaryButton} mt-2`}>
+              <span>{moderationPending ? feedback.saving : event.moderationStatus === "platform_suspended" ? "Lift platform suspension" : "Suspend from platform"}</span>
+            </button>
+            <ActionFeedback state={moderationState} success={feedback.reviewSaved} />
+          </form>
         </div>
       </div>
     </article>

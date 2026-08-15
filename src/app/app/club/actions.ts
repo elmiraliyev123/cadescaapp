@@ -2,16 +2,21 @@
 
 import { revalidatePath } from "next/cache";
 
+import { isClubRole } from "@/lib/clubs/permissions";
 import {
   acceptClubMembership,
+  addEventGalleryImage,
   assignScannerToEvent,
   cancelClubEvent,
   createEventDraft,
+  deleteClubEventDraft,
+  deleteEventGalleryImage,
   inviteClubMember,
   revokeClubMembership,
   revokeScannerFromEvent,
   submitEventForReview,
   updateEventDraft,
+  updateEventCapacity,
   type EventDraftInput,
   EventsError
 } from "@/lib/server/events";
@@ -152,12 +157,66 @@ export async function cancelClubEventAction(
   }
 }
 
+export async function deleteClubEventDraftAction(
+  _previousState: ClubActionState = EMPTY_STATE,
+  formData: FormData
+): Promise<ClubActionState> {
+  const eventId = text(formData, "eventId");
+  try {
+    await deleteClubEventDraft(eventId);
+    revalidatePath("/app/club");
+    revalidatePath("/app/club/events");
+    return { ok: true, message: "events.event.deleted", eventId };
+  } catch (error) {
+    return { ok: false, message: actionMessage(error), eventId };
+  }
+}
+
+export async function addEventGalleryImageAction(
+  _previousState: ClubActionState = EMPTY_STATE,
+  formData: FormData
+): Promise<ClubActionState> {
+  const eventId = text(formData, "eventId");
+  const image = formData.get("image");
+  try {
+    if (!(image instanceof File)) throw new EventsError("event_image_invalid", 422);
+    await addEventGalleryImage(eventId, image, text(formData, "altText"));
+    revalidatePath(`/app/club/events/${eventId}`);
+    return { ok: true, message: "events.event.imageAdded", eventId };
+  } catch (error) {
+    return { ok: false, message: actionMessage(error), eventId };
+  }
+}
+
+export async function deleteEventGalleryImageAction(formData: FormData) {
+  const eventId = text(formData, "eventId");
+  await deleteEventGalleryImage(eventId, text(formData, "imageId"));
+  revalidatePath(`/app/club/events/${eventId}`);
+}
+
+export async function updateEventCapacityAction(
+  _previousState: ClubActionState = EMPTY_STATE,
+  formData: FormData
+): Promise<ClubActionState> {
+  const eventId = text(formData, "eventId");
+  try {
+    await updateEventCapacity(eventId, Number(text(formData, "capacity")));
+    revalidatePath("/app/club");
+    revalidatePath(`/app/club/events/${eventId}`);
+    revalidatePath("/app/user/events");
+    revalidatePath("/events");
+    return { ok: true, message: "events.event.capacityUpdated", eventId };
+  } catch (error) {
+    return { ok: false, message: actionMessage(error), eventId };
+  }
+}
+
 export async function inviteClubMemberAction(
   _previousState: ClubActionState = EMPTY_STATE,
   formData: FormData
 ): Promise<ClubActionState> {
   const role = text(formData, "role");
-  if (role !== "event_organizer" && role !== "finance_manager" && role !== "door_scanner") {
+  if (!isClubRole(role) || role === "club_owner") {
     return { ok: false, message: "events.error.club_member_invalid" };
   }
   try {

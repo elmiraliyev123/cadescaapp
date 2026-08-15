@@ -6,16 +6,21 @@ import { useRouter } from "next/navigation";
 
 import {
   assignScannerToEventAction,
+  addEventGalleryImageAction,
   cancelClubEventAction,
   createEventDraftAction,
+  deleteClubEventDraftAction,
+  deleteEventGalleryImageAction,
   inviteClubMemberAction,
   revokeClubMembershipAction,
   revokeScannerFromEventAction,
   submitEventForReviewAction,
+  updateEventCapacityAction,
   updateEventDraftAction,
   type ClubActionState
 } from "@/app/app/club/actions";
 import { ApprovedClubProfileForm } from "@/components/clubs/ApprovedClubProfileForm";
+import { hasClubCapability } from "@/lib/clubs/permissions";
 import {
   ClubEventNav,
   EventCard,
@@ -116,8 +121,12 @@ function auditActivityLabel(action: string, copy: (typeof clubManagementCopy)[La
 }
 
 function visibleClubNavigation(roles: readonly ClubRole[]) {
-  const items: Array<"overview" | "events" | "finance" | "scanner"> = [];
-  if (canManageClubEvents(roles)) items.push("overview", "events");
+  const items: Array<"overview" | "posts" | "events" | "members" | "settings" | "finance" | "scanner"> = [];
+  if (hasClubCapability(roles, "club.workspace.view")) items.push("overview");
+  if (hasClubCapability(roles, "club.posts.create")) items.push("posts");
+  if (canManageClubEvents(roles)) items.push("events");
+  if (hasClubCapability(roles, "club.members.manage")) items.push("members");
+  if (hasClubCapability(roles, "club.settings.manage")) items.push("settings");
   if (canManageClubFinance(roles)) items.push("finance");
   if (canScanClubEvents(roles)) items.push("scanner");
   return items;
@@ -183,25 +192,24 @@ function ClubMutationForm({
 }
 
 export function ClubDashboardView({ dashboard }: { dashboard: ClubDashboardPresentation }) {
-  const { copy, language, statusLabel } = useEventsI18n();
-  const management = clubManagementCopy[language];
+  const { copy } = useEventsI18n();
   const analytics = dashboard.analytics;
   const canManage = canManageClubEvents(dashboard.roles);
   const visibleNavigation = visibleClubNavigation(dashboard.roles);
+  const clubQuery = `?clubId=${encodeURIComponent(dashboard.club.id)}`;
   return (
     <EventsFrame>
-      <ClubEventNav current="overview" visible={visibleNavigation} />
+      <ClubEventNav current="overview" visible={visibleNavigation} clubId={dashboard.club.id} />
       <EventsHeader
         eyebrow={dashboard.club.name}
         title={copy.clubDashboard}
         description={copy.clubDashboardDescription}
-        action={canManage ? <Link href="/dashboard/events/new" className={eventPrimaryButton}><span>{copy.createEvent}</span></Link> : undefined}
+        action={canManage ? <Link href={`/dashboard/events/new${clubQuery}`} className={eventPrimaryButton}><span>{copy.createEvent}</span></Link> : undefined}
       />
       <div className="mb-7 flex flex-wrap items-center gap-2">
         <EventStatusPill status={dashboard.club.status} />
         {dashboard.roles.map((role) => <EventStatusPill key={role} status={role} />)}
       </div>
-      {dashboard.roles.includes("club_owner") ? <ApprovedClubProfileForm club={dashboard.club} /> : null}
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <EventMetric label={copy.requests} value={analytics.totalRequests} icon="confirmation_number" />
         <EventMetric label={copy.activeReservations} value={analytics.activeReservations} icon="timer" />
@@ -216,16 +224,27 @@ export function ClubDashboardView({ dashboard }: { dashboard: ClubDashboardPrese
       <section className="mt-9">
         <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
           <h2 className="text-[22px] font-black">{copy.clubEvents}</h2>
-          <Link href="/dashboard/events" className={eventSecondaryButton}><span>{copy.viewEvent}</span></Link>
+          <Link href={`/dashboard/events${clubQuery}`} className={eventSecondaryButton}><span>{copy.viewEvent}</span></Link>
         </div>
         {dashboard.events.length ? (
           <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
             {dashboard.events.slice(0, 3).map((event) => <EventCard key={event.id} event={event} href={`/dashboard/events/${event.id}`} />)}
           </div>
-        ) : <EventEmptyState text={copy.noClubEvents} action={canManage ? <Link href="/dashboard/events/new" className={eventPrimaryButton}><span>{copy.createEvent}</span></Link> : undefined} />}
+        ) : <EventEmptyState text={copy.noClubEvents} action={canManage ? <Link href={`/dashboard/events/new${clubQuery}`} className={eventPrimaryButton}><span>{copy.createEvent}</span></Link> : undefined} />}
       </section>
 
-      {dashboard.roles.includes("club_owner") ? <section className="mt-9">
+    </EventsFrame>
+  );
+}
+
+export function ClubMembersView({ dashboard }: { dashboard: ClubDashboardPresentation }) {
+  const { copy, language, statusLabel } = useEventsI18n();
+  const management = clubManagementCopy[language];
+  return (
+    <EventsFrame>
+      <ClubEventNav current="members" visible={visibleClubNavigation(dashboard.roles)} clubId={dashboard.club.id} />
+      <EventsHeader eyebrow={dashboard.club.name} title={copy.members} description="Invite managers and assign only the capabilities they need." />
+      <section>
         <h2 className="mb-4 text-[22px] font-black">{copy.members}</h2>
         <ClubMutationForm
           action={inviteClubMemberAction}
@@ -239,7 +258,11 @@ export function ClubDashboardView({ dashboard }: { dashboard: ClubDashboardPrese
           <input type="hidden" name="clubId" value={dashboard.club.id} />
           <Field label={management.accountIdentifier}><input name="usernameOrEmail" required maxLength={254} autoComplete="off" className={eventInput} /></Field>
           <Field label={copy.role}>
-            <select name="role" defaultValue="event_organizer" className={eventInput}>
+            <select name="role" defaultValue="event_manager" className={eventInput}>
+              <option value="club_admin">{statusLabel("club_admin")}</option>
+              <option value="event_manager">{statusLabel("event_manager")}</option>
+              <option value="content_manager">{statusLabel("content_manager")}</option>
+              <option value="club_member">{statusLabel("club_member")}</option>
               <option value="event_organizer">{statusLabel("event_organizer")}</option>
               <option value="finance_manager">{statusLabel("finance_manager")}</option>
               <option value="door_scanner">{statusLabel("door_scanner")}</option>
@@ -273,23 +296,33 @@ export function ClubDashboardView({ dashboard }: { dashboard: ClubDashboardPrese
             </tbody>
           </table>
         </div>
-      </section> : null}
+      </section>
     </EventsFrame>
   );
 }
 
-export function ClubEventsListView({ clubName, roles, events }: { clubName: string; roles: ClubRole[]; events: ClubEventSummary[] }) {
+export function ClubSettingsView({ dashboard }: { dashboard: ClubDashboardPresentation }) {
+  return (
+    <EventsFrame>
+      <ClubEventNav current="settings" visible={visibleClubNavigation(dashboard.roles)} clubId={dashboard.club.id} />
+      <EventsHeader eyebrow={dashboard.club.name} title="Settings" description="Manage the public club identity shown across Cadesca." />
+      <ApprovedClubProfileForm club={dashboard.club} />
+    </EventsFrame>
+  );
+}
+
+export function ClubEventsListView({ clubId, clubName, roles, events }: { clubId: string; clubName: string; roles: ClubRole[]; events: ClubEventSummary[] }) {
   const { copy } = useEventsI18n();
   const canManage = canManageClubEvents(roles);
   return (
     <EventsFrame>
-      <ClubEventNav current="events" visible={visibleClubNavigation(roles)} />
-      <EventsHeader eyebrow={clubName} title={copy.clubEvents} action={canManage ? <Link href="/dashboard/events/new" className={eventPrimaryButton}><span>{copy.createEvent}</span></Link> : undefined} />
+      <ClubEventNav current="events" visible={visibleClubNavigation(roles)} clubId={clubId} />
+      <EventsHeader eyebrow={clubName} title={copy.clubEvents} action={canManage ? <Link href={`/dashboard/events/new?clubId=${encodeURIComponent(clubId)}`} className={eventPrimaryButton}><span>{copy.createEvent}</span></Link> : undefined} />
       {events.length ? (
         <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
           {events.map((event) => <EventCard key={event.id} event={event} href={`/dashboard/events/${event.id}`} />)}
         </div>
-      ) : <EventEmptyState text={copy.noClubEvents} action={canManage ? <Link href="/dashboard/events/new" className={eventPrimaryButton}><span>{copy.createEvent}</span></Link> : undefined} />}
+      ) : <EventEmptyState text={copy.noClubEvents} action={canManage ? <Link href={`/dashboard/events/new?clubId=${encodeURIComponent(clubId)}`} className={eventPrimaryButton}><span>{copy.createEvent}</span></Link> : undefined} />}
     </EventsFrame>
   );
 }
@@ -394,7 +427,7 @@ export function ClubEventForm({
 
   return (
     <EventsFrame>
-      <ClubEventNav current="events" visible={visibleNavigation} />
+      <ClubEventNav current="events" visible={visibleNavigation} clubId={workspace.clubId} />
       <EventsHeader eyebrow={workspace.clubName} title={isEdit ? copy.editEvent : copy.createEvent} description={copy.eventFormDescription} />
       <form action={formAction} className="rounded-2xl border-2 border-black bg-white p-4 shadow-[5px_5px_0_#ffd400] sm:p-6">
         <input type="hidden" name="clubId" value={workspace.clubId} />
@@ -440,7 +473,7 @@ export function ClubEventForm({
         <div className="mt-6 flex flex-wrap gap-3">
           <button type="submit" disabled={pending} className={eventPrimaryButton}><span>{pending ? copy.loading : copy.saveDraft}</span></button>
           {state.ok && state.eventId ? <Link href={`/dashboard/events/${state.eventId}`} className={eventSecondaryButton}><span>{copy.viewEvent}</span></Link> : null}
-          <Link href="/dashboard/events" className={eventSecondaryButton}><span>{copy.clubEvents}</span></Link>
+          <Link href={`/dashboard/events?clubId=${encodeURIComponent(workspace.clubId)}`} className={eventSecondaryButton}><span>{copy.clubEvents}</span></Link>
         </div>
       </form>
     </EventsFrame>
@@ -458,7 +491,7 @@ export function ClubEventManageView({ workspace, event, operations }: { workspac
   );
   return (
     <EventsFrame>
-      <ClubEventNav current="events" visible={visibleClubNavigation(workspace.roles)} />
+      <ClubEventNav current="events" visible={visibleClubNavigation(workspace.roles)} clubId={workspace.clubId} />
       <EventsHeader
         eyebrow={workspace.clubName}
         title={event.title}
@@ -480,6 +513,51 @@ export function ClubEventManageView({ workspace, event, operations }: { workspac
           <p><strong>{copy.location}:</strong> {event.location}</p>
         </div>
       </div>
+      {canManage && event.moderationStatus !== "platform_suspended" ? (
+        <ClubMutationForm
+          action={updateEventCapacityAction}
+          className="mt-5 space-y-3 rounded-2xl border-2 border-black bg-[#fffaf0] p-4"
+          buttonClassName={eventPrimaryButton}
+          submitLabel="Update capacity"
+          pendingLabel={management.saving}
+          successLabel="Capacity updated"
+        >
+          <input type="hidden" name="eventId" value={event.id} />
+          <label className="block">
+            <span className="mb-1.5 block text-[11px] font-black uppercase tracking-[0.08em]">{copy.capacity}</span>
+            <input type="number" name="capacity" min={1} max={100000} required defaultValue={event.capacity} className={eventInput} />
+          </label>
+          <p className="text-[12px] leading-5 text-black/60">Capacity cannot be reduced below confirmed or held reservations.</p>
+        </ClubMutationForm>
+      ) : null}
+      {canManage && event.moderationStatus !== "platform_suspended" ? (
+        <section className="mt-8">
+          <h2 className="mb-4 text-[22px] font-black">Event images</h2>
+          <ClubMutationForm
+            action={addEventGalleryImageAction}
+            className="grid gap-3 rounded-2xl border-2 border-black bg-white p-4 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto] sm:items-end"
+            buttonClassName={eventPrimaryButton}
+            submitLabel="Add image"
+            pendingLabel={management.saving}
+            successLabel="Image added"
+            feedbackClassName="sm:col-span-3"
+          >
+            <input type="hidden" name="eventId" value={event.id} />
+            <Field label="Image"><input type="file" name="image" required accept="image/jpeg,image/png,image/webp,image/avif" className={eventInput} /></Field>
+            <Field label="Alternative text"><input name="altText" maxLength={240} className={eventInput} placeholder="Describe the image" /></Field>
+          </ClubMutationForm>
+          {operations.gallery.length ? <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">{operations.gallery.map((image) => (
+            <article key={image.id} className="overflow-hidden rounded-2xl border-2 border-black bg-white">
+              <img src={image.url} alt={image.altText || "Event gallery image"} className="aspect-[4/3] w-full object-cover" />
+              <form action={deleteEventGalleryImageAction} className="p-3">
+                <input type="hidden" name="eventId" value={event.id} />
+                <input type="hidden" name="imageId" value={image.id} />
+                <button type="submit" className={cn(eventSecondaryButton, "w-full")}><span>Delete image</span></button>
+              </form>
+            </article>
+          ))}</div> : null}
+        </section>
+      ) : null}
       <section className="mt-8">
         <h2 className="mb-4 text-[22px] font-black">{management.attendees}</h2>
         {operations.attendees.length ? <div className="overflow-x-auto rounded-2xl border-2 border-black bg-white">
@@ -535,6 +613,20 @@ export function ClubEventManageView({ workspace, event, operations }: { workspac
         >
           <input type="hidden" name="eventId" value={event.id} />
           <p className="text-[14px] font-bold leading-6">{copy.eventFormDescription}</p>
+        </ClubMutationForm>
+      ) : null}
+      {canManage && event.status === "draft" && event.moderationStatus !== "platform_suspended" ? (
+        <ClubMutationForm
+          action={deleteClubEventDraftAction}
+          className="mt-4 space-y-3 rounded-2xl border-2 border-black bg-white p-5"
+          buttonClassName={eventSecondaryButton}
+          submitLabel="Delete draft"
+          pendingLabel={management.saving}
+          successLabel="Draft deleted"
+          confirmMessage="Delete this draft permanently?"
+        >
+          <input type="hidden" name="eventId" value={event.id} />
+          <p className="text-[13px] leading-5 text-black/60">Only unpublished drafts without reservations can be deleted.</p>
         </ClubMutationForm>
       ) : null}
       {canCancel ? (
@@ -670,22 +762,22 @@ function FinanceTicketRow({ ticket, roles }: { ticket: ClubFinanceTicket; roles:
   );
 }
 
-export function ClubFinanceView({ tickets, clubName, roles }: { tickets: ClubFinanceTicket[]; clubName: string; roles: ClubRole[] }) {
+export function ClubFinanceView({ tickets, clubId, clubName, roles }: { tickets: ClubFinanceTicket[]; clubId: string; clubName: string; roles: ClubRole[] }) {
   const { copy } = useEventsI18n();
   return (
     <EventsFrame>
-      <ClubEventNav current="finance" visible={visibleClubNavigation(roles)} />
+      <ClubEventNav current="finance" visible={visibleClubNavigation(roles)} clubId={clubId} />
       <EventsHeader eyebrow={clubName} title={copy.finance} description={copy.financeDescription} />
       {tickets.length ? <div className="grid gap-4 lg:grid-cols-2">{tickets.map((ticket) => <FinanceTicketRow key={ticket.id} ticket={ticket} roles={roles} />)}</div> : <EventEmptyState text={copy.noFinanceRequests} />}
     </EventsFrame>
   );
 }
 
-export function ScannerEventListView({ events }: { events: ScannerAssignedEvent[] }) {
+export function ScannerEventListView({ events, clubId, roles }: { events: ScannerAssignedEvent[]; clubId: string; roles: ClubRole[] }) {
   const { copy, formatDateTime } = useEventsI18n();
   return (
     <EventsFrame>
-      <ClubEventNav current="scanner" visible={["scanner"]} />
+      <ClubEventNav current="scanner" visible={visibleClubNavigation(roles)} clubId={clubId} />
       <EventsHeader title={copy.scannerEvents} description={copy.scannerEventsDescription} />
       {events.length ? <div className="grid gap-4 md:grid-cols-2">{events.map((event) => (
         <article key={event.id} className="rounded-2xl border-2 border-black bg-white p-5 shadow-[4px_4px_0_#ffd400]">

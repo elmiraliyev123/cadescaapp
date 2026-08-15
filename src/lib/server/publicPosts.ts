@@ -2,7 +2,7 @@ import "server-only";
 
 import { cache } from "react";
 
-import { getPublicUrl } from "@/lib/appConfig";
+import { getAppUrl, getPublicUrl } from "@/lib/appConfig";
 import { isPublicPostIndexable } from "@/lib/seo/publicIndexingPolicy";
 import { isPublicImageObjectPath } from "@/lib/server/publicAssets";
 import { getReadyPool } from "@/lib/server/users";
@@ -32,6 +32,8 @@ type PublicPostRow = {
   has_open_report: boolean;
   like_count: number;
   comment_count: number;
+  actor_type: "user" | "club";
+  club_id: string | null;
 };
 
 export type PublicPostPreview = {
@@ -81,9 +83,11 @@ async function loadPublicPostPreview(postId: string): Promise<PublicPostPreview 
        post.image_url,
        post.created_at,
        post.updated_at,
-       coalesce(nullif(btrim(author.display_name), ''), author.name, 'Cadesca Student') as author_display_name,
-       author.username as author_username,
-       author.avatar_url as author_avatar_url,
+       case when post.actor_type = 'club' then club.name else coalesce(nullif(btrim(author.display_name), ''), author.name, 'Cadesca Student') end as author_display_name,
+       case when post.actor_type = 'club' then club.slug else author.username end as author_username,
+       case when post.actor_type = 'club' then club.logo_url else author.avatar_url end as author_avatar_url,
+       post.actor_type,
+       post.club_id::text,
        university.name as university_name,
        post.status as post_status,
        post.visibility,
@@ -115,21 +119,34 @@ async function loadPublicPostPreview(postId: string): Promise<PublicPostPreview 
      join public.users author
        on author.id = post.user_id
       and author.university_id = post.university_id
+     left join public.student_clubs club
+       on club.id = post.club_id
+      and club.university_id = post.university_id
      join public.universities university
        on university.id = post.university_id
      where post.id = $1::uuid
        and post.status = 'active'
        and post.visibility = 'public_preview'
        and university.status = 'active'
-       and author.role = 'user'
-       and author.status = 'active'
-       and author.student_status = 'verified'
-       and author.username is not null
-       and author.username ~ '^[a-z0-9_][a-z0-9_.]{1,28}[a-z0-9_]$'
-       and position('..' in author.username) = 0
-       and author.public_profile_enabled = true
-       and author.suspended_at is null
-       and author.deleted_at is null
+       and (
+         (
+           post.actor_type = 'user'
+           and author.role = 'user'
+           and author.status = 'active'
+           and author.student_status = 'verified'
+           and author.username is not null
+           and author.username ~ '^[a-z0-9_][a-z0-9_.]{1,28}[a-z0-9_]$'
+           and position('..' in author.username) = 0
+           and author.public_profile_enabled = true
+           and author.suspended_at is null
+           and author.deleted_at is null
+         )
+         or (
+           post.actor_type = 'club'
+           and club.status = 'approved'
+           and club.slug is not null
+         )
+       )
        and not exists (
          select 1
          from public.university_post_reports report
@@ -142,7 +159,7 @@ async function loadPublicPostPreview(postId: string): Promise<PublicPostPreview 
 
   const row = result.rows[0];
   if (!row) return null;
-  if (!isPublicPostIndexable({
+  if (row.actor_type === "user" && !isPublicPostIndexable({
     profile: {
       role: row.author_role,
       status: row.author_status,
@@ -159,7 +176,9 @@ async function loadPublicPostPreview(postId: string): Promise<PublicPostPreview 
     return null;
   }
 
-  const authorProfileUrl = `${getPublicUrl()}/user/${encodeURIComponent(row.author_username)}`;
+  const authorProfileUrl = row.actor_type === "club"
+    ? `${getAppUrl()}/app/user/clubs/${encodeURIComponent(row.author_username)}`
+    : `${getPublicUrl()}/user/${encodeURIComponent(row.author_username)}`;
 
   return {
     id: row.id,
@@ -169,7 +188,9 @@ async function loadPublicPostPreview(postId: string): Promise<PublicPostPreview 
     updatedAt: toIso(row.updated_at),
     authorDisplayName: row.author_display_name,
     authorUsername: row.author_username,
-    authorAvatarUrl: publicAvatarUrl(row.author_username, row.author_avatar_url),
+    authorAvatarUrl: row.actor_type === "club" && row.club_id && isPublicImageObjectPath(row.author_avatar_url)
+      ? `${getPublicUrl()}/media/club/${encodeURIComponent(row.club_id)}`
+      : publicAvatarUrl(row.author_username, row.author_avatar_url),
     authorProfileUrl,
     universityName: row.university_name,
     likeCount: row.like_count,
@@ -189,21 +210,33 @@ export async function getPublicPostImageObjectPath(postId: string) {
      join public.users author
        on author.id = post.user_id
       and author.university_id = post.university_id
+     left join public.student_clubs club
+       on club.id = post.club_id
+      and club.university_id = post.university_id
      join public.universities university
        on university.id = post.university_id
      where post.id = $1::uuid
        and post.status = 'active'
        and post.visibility = 'public_preview'
        and university.status = 'active'
-       and author.role = 'user'
-       and author.status = 'active'
-       and author.student_status = 'verified'
-       and author.username is not null
-       and author.username ~ '^[a-z0-9_][a-z0-9_.]{1,28}[a-z0-9_]$'
-       and position('..' in author.username) = 0
-       and author.public_profile_enabled = true
-       and author.suspended_at is null
-       and author.deleted_at is null
+       and (
+         (
+           post.actor_type = 'user'
+           and author.role = 'user'
+           and author.status = 'active'
+           and author.student_status = 'verified'
+           and author.username is not null
+           and author.username ~ '^[a-z0-9_][a-z0-9_.]{1,28}[a-z0-9_]$'
+           and position('..' in author.username) = 0
+           and author.public_profile_enabled = true
+           and author.suspended_at is null
+           and author.deleted_at is null
+         )
+         or (
+           post.actor_type = 'club'
+           and club.status = 'approved'
+         )
+       )
        and not exists (
          select 1
          from public.university_post_reports report

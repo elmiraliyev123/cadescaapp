@@ -5,9 +5,10 @@ import { getCurrentClubDashboard } from "@/lib/server/events";
 
 export const dynamic = "force-dynamic";
 
-export default async function NewClubEventPage() {
+export default async function NewClubEventPage({ searchParams }: { searchParams: Promise<{ clubId?: string }> }) {
   try {
-    const dashboard = await getCurrentClubDashboard();
+    const { clubId } = await searchParams;
+    const dashboard = await getCurrentClubDashboard(clubId);
     if (!dashboard) return <EventsRouteError error="club_not_found" />;
     if (!canManageClubEvents(dashboard.roles)) return <EventsRouteError error="club_access_denied" />;
     return <ClubEventForm workspace={{ clubId: dashboard.club.id, clubName: dashboard.club.name, roles: dashboard.roles }} />;

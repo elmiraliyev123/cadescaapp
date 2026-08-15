@@ -6,7 +6,8 @@ export type ClubStatus =
   | "suspended"
   | "archived";
 
-export type ClubRole = "club_owner" | "event_organizer" | "finance_manager" | "door_scanner";
+export type { ClubRole } from "@/lib/clubs/permissions";
+import type { ClubRole } from "@/lib/clubs/permissions";
 
 export type EventStatus =
   | "draft"
@@ -79,6 +80,7 @@ export type EventDiscoveryItem = {
   featuredStatus: FeaturedStatus;
   featuredUntil: string | null;
   publishedAt: string | null;
+  moderationStatus?: "active" | "platform_suspended";
 };
 
 export type EventDetail = EventDiscoveryItem & {
@@ -172,6 +174,12 @@ export type ClubEventOperations = {
   attendees: ClubEventAttendee[];
   scanners: EventScannerCandidate[];
   audit: ClubAuditEntry[];
+  gallery: Array<{
+    id: string;
+    url: string;
+    altText: string | null;
+    sortOrder: number;
+  }>;
 };
 
 export type ClubDashboard = {

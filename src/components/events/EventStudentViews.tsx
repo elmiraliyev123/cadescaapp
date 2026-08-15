@@ -21,13 +21,17 @@ import { cn } from "@/lib/utils";
 export function EventsDiscoveryView({
   events,
   featuredEvents,
-  query
+  query,
+  publicView = false
 }: {
   events: EventDiscoveryItem[];
   featuredEvents: EventDiscoveryItem[];
   query: string;
+  publicView?: boolean;
 }) {
   const { copy } = useEventsI18n();
+  const eventsPath = publicView ? "/events" : "/app/user/events";
+  const eventHref = (slug: string) => publicView ? `/event/${slug}` : `/app/user/events/${slug}`;
 
   return (
     <EventsFrame>
@@ -35,15 +39,15 @@ export function EventsDiscoveryView({
         eyebrow={copy.events}
         title={copy.discoverTitle}
         description={copy.discoverDescription}
-        action={
+        action={!publicView ? (
           <Link href="/app/user/tickets" className={eventSecondaryButton}>
             <span className="material-symbols-outlined text-[19px]" aria-hidden="true">confirmation_number</span>
             <span>{copy.myTickets}</span>
           </Link>
-        }
+        ) : undefined}
       />
 
-      <form action="/app/user/events" method="get" className="mb-8 flex flex-col gap-2 sm:flex-row">
+      <form action={eventsPath} method="get" className="mb-8 flex flex-col gap-2 sm:flex-row">
         <label className="min-w-0 flex-1">
           <span className="sr-only">{copy.searchPlaceholder}</span>
           <span className="relative block">
@@ -58,7 +62,7 @@ export function EventsDiscoveryView({
           </span>
         </label>
         <button type="submit" className={eventPrimaryButton}><span>{copy.search}</span></button>
-        {query ? <Link href="/app/user/events" className={eventSecondaryButton}><span>{copy.clearSearch}</span></Link> : null}
+        {query ? <Link href={eventsPath} className={eventSecondaryButton}><span>{copy.clearSearch}</span></Link> : null}
       </form>
 
       {!query && featuredEvents.length ? (
@@ -68,7 +72,7 @@ export function EventsDiscoveryView({
             <h2 className="text-[22px] font-black tracking-[-0.025em]">{copy.featured}</h2>
           </div>
           <div className="grid gap-5 md:grid-cols-2">
-            {featuredEvents.map((event) => <EventCard key={event.id} event={event} href={`/app/user/events/${event.slug}`} />)}
+            {featuredEvents.map((event) => <EventCard key={event.id} event={event} href={eventHref(event.slug)} />)}
           </div>
         </section>
       ) : null}
@@ -80,7 +84,7 @@ export function EventsDiscoveryView({
         </div>
         {events.length ? (
           <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
-            {events.map((event) => <EventCard key={event.id} event={event} href={`/app/user/events/${event.slug}`} />)}
+            {events.map((event) => <EventCard key={event.id} event={event} href={eventHref(event.slug)} />)}
           </div>
         ) : <EventEmptyState text={copy.noEvents} />}
       </section>

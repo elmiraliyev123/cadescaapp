@@ -25,7 +25,7 @@ export function ClubLoginScreen({ authHref }: { authHref: string }) {
             href={authHref}
             className="mt-8 inline-flex h-12 w-full items-center justify-center rounded-xl bg-[#0A0A0A] px-5 text-sm font-semibold text-white transition-colors hover:bg-[#252525] sm:w-auto"
           >
-            Login with Cadesca
+            Login via Cadesca
           </Link>
         </section>
       </div>

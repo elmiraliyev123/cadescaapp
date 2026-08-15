@@ -14,6 +14,7 @@
     "test:events:db": "node --import tsx scripts/test-events-db.ts",
     "test:moderation": "node --conditions=react-server --import tsx scripts/test-moderation.ts",
     "test:seo": "node --import tsx scripts/test-seo-structured-data.ts",
+    "test:ecosystem": "node --import tsx scripts/test-ecosystem-domain.ts",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {

@@ -3,6 +3,7 @@ import "server-only";
 import { createHmac, randomUUID } from "node:crypto";
 import type { PoolClient } from "pg";
 
+import type { ClubRole } from "@/lib/clubs/permissions";
 import { assertImageAllowed } from "@/lib/server/imageModeration";
 import { hashMerchantPassword } from "@/lib/server/merchants";
 import { getCurrentStudentContext } from "@/lib/server/social";
@@ -70,7 +71,7 @@ export type ClubApplicationView = {
     username: string | null;
   };
   membershipStatus: "invited" | "active" | "revoked" | "left" | "suspended";
-  roles: Array<"club_owner" | "event_organizer" | "finance_manager" | "door_scanner">;
+  roles: ClubRole[];
   logoUrl: string | null;
   createdAt: string;
   updatedAt: string;
@@ -88,7 +89,7 @@ export type ClubMembershipInvitation = {
   clubId: string;
   clubName: string;
   universityName: string;
-  role: "club_owner" | "event_organizer" | "finance_manager" | "door_scanner";
+  role: ClubRole;
   invitedAt: string;
 };
 
@@ -97,6 +98,15 @@ export type UserClubAccessSummary = {
   hasActiveMembership: boolean;
   invitationCount: number;
   gatewayHref: "/app/user/club";
+};
+
+export type ManagedClubSummary = {
+  id: string;
+  name: string;
+  slug: string;
+  universityName: string;
+  logoUrl: string | null;
+  roles: ClubRole[];
 };
 
 export type ClubApplicationInput = {
@@ -1208,6 +1218,44 @@ export async function hasCurrentActiveClubMembership() {
   return Boolean(result.rows[0]?.active);
 }
 
+export async function listCurrentManagedClubs(): Promise<ManagedClubSummary[]> {
+  const user = await getCurrentStudentContext();
+  if (!user || user.status !== "active" || user.id === "user_mock") return [];
+  const pool = await getReadyPool();
+  const result = await pool.query<{
+    id: string;
+    name: string;
+    slug: string;
+    university_name: string;
+    logo_url: string | null;
+    roles: ClubRole[];
+  }>(
+    `SELECT club.id,
+            club.name,
+            club.slug,
+            university.name AS university_name,
+            club.logo_url,
+            array_agg(membership.role ORDER BY membership.role)::text[] AS roles
+       FROM public.student_clubs club
+       JOIN public.club_memberships membership ON membership.club_id = club.id
+       JOIN public.universities university ON university.id = club.university_id
+      WHERE membership.user_id = $1
+        AND membership.status = 'active'
+        AND club.status = 'approved'
+      GROUP BY club.id, university.name
+      ORDER BY club.name ASC`,
+    [user.id]
+  );
+  return result.rows.map((club) => ({
+    id: club.id,
+    name: club.name,
+    slug: club.slug,
+    universityName: club.university_name,
+    logoUrl: club.logo_url ? `/media/club/${encodeURIComponent(club.id)}` : null,
+    roles: club.roles
+  }));
+}
+
 export async function getUserClubAccessSummary(userId: string): Promise<UserClubAccessSummary> {
   const normalizedUserId = userId.trim();
   if (!normalizedUserId || normalizedUserId.length > 160) {
@@ -1875,6 +1923,27 @@ export async function reviewClubApplication(input: {
          FROM public.student_clubs club
         WHERE club.id = $1::uuid`,
       [input.clubId, `club_application_${input.decision}`, actorHash, input.decision]
+    );
+    await client.query(
+      `INSERT INTO public.notifications (user_id, type, title, body, href, actor_type, actor_id, metadata)
+       SELECT DISTINCT membership.user_id,
+              $2,
+              $3,
+              $4,
+              '/app/user/club',
+              'club',
+              $1::text,
+              jsonb_build_object('decision', $5::text)
+         FROM public.club_memberships membership
+        WHERE membership.club_id = $1::uuid
+          AND membership.role = 'club_owner'`,
+      [
+        input.clubId,
+        `club_application_${input.decision}`,
+        input.decision === "approve" ? "Club application approved" : input.decision === "reject" ? "Club application rejected" : "Club application needs clarification",
+        message,
+        input.decision
+      ]
     );
     await client.query("COMMIT");
   } catch (error) {

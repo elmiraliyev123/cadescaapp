@@ -5,12 +5,13 @@ import { getCurrentClubDashboard } from "@/lib/server/events";
 
 export const dynamic = "force-dynamic";
 
-export default async function ClubEventsPage() {
+export default async function ClubEventsPage({ searchParams }: { searchParams: Promise<{ clubId?: string }> }) {
   try {
-    const dashboard = await getCurrentClubDashboard();
+    const { clubId } = await searchParams;
+    const dashboard = await getCurrentClubDashboard(clubId);
     if (!dashboard) return <EventsRouteError error="club_not_found" />;
     if (!canManageClubEvents(dashboard.roles)) return <EventsRouteError error="club_access_denied" />;
-    return <ClubEventsListView clubName={dashboard.club.name} roles={dashboard.roles} events={dashboard.events} />;
+    return <ClubEventsListView clubId={dashboard.club.id} clubName={dashboard.club.name} roles={dashboard.roles} events={dashboard.events} />;
   } catch (error) {
     console.error("[club_events] unavailable", { reason: error instanceof Error ? error.name : "unknown" });
     return <EventsRouteError error={(error as { code?: string })?.code} />;

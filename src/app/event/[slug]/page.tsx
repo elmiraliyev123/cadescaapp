@@ -12,7 +12,7 @@ type Props = { params: Promise<{ slug: string }> };
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { slug } = await params;
-  const event = await getDiscoverableEventBySlug(slug).catch(() => null);
+  const event = await getDiscoverableEventBySlug(slug, true).catch(() => null);
   if (!event) return { title: "Event unavailable | Cadesca", robots: { index: false, follow: false } };
   const canonical = `${getPublicUrl()}/event/${encodeURIComponent(event.slug)}`;
   const description = event.description.replace(/\s+/g, " ").trim().slice(0, 180);
@@ -40,7 +40,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 
 export default async function PublicEventPage({ params }: Props) {
   const { slug } = await params;
-  const event = await getDiscoverableEventBySlug(slug);
+  const event = await getDiscoverableEventBySlug(slug, true);
   if (!event) notFound();
   return (
     <div className="min-h-dvh bg-[#fffaf0]">

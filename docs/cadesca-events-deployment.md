@@ -4,7 +4,7 @@ Deploy application code and the Events database migration as one coordinated rel
 
 ## Supabase
 
-1. Review and apply `supabase/migrations/20260718081640_cadesca_events.sql` in a staging branch first.
+1. Review and apply `supabase/migrations/20260718081640_cadesca_events.sql`, then the additive `supabase/migrations/20260815000000_student_ecosystem_foundation.sql`, in a staging branch first.
 2. Run the Supabase security and performance advisors after the migration and resolve every Events-related finding.
 3. Confirm the `event-assets`, `club-verification`, and `event-receipts` buckets exist with the migration-defined privacy and MIME/size limits.
 4. Keep `SUPABASE_SERVICE_ROLE_KEY` server-only. Do not expose it through a `NEXT_PUBLIC_` variable.
@@ -23,6 +23,10 @@ The linked project does not currently have `pg_cron`; reservation cleanup is the
 Required existing values remain unchanged. Add:
 
 - `NEXT_PUBLIC_STUDENT_CLUB_ORIGIN=https://studentclub.cadesca.com`
+- `NEXT_PUBLIC_AUTH_ORIGIN=https://auth.cadesca.com`
+- `NEXT_PUBLIC_APP_ORIGIN=https://app.cadesca.com`
+- `NEXT_PUBLIC_EVENTS_ORIGIN=https://events.cadesca.com`
+- `NEXT_PUBLIC_BILMATCH_ORIGIN=https://bilmatch.com.tr`
 - `CRON_SECRET` — a high-entropy server-only value used by Vercel Cron
 - `NEXT_PUBLIC_COOKIE_DOMAIN=.cadesca.com`
 
@@ -47,13 +51,14 @@ For event and club image moderation, keep the existing Cloudflare moderation cre
 
 ## DNS and domains
 
-1. Add `studentclub.cadesca.com` to the same Vercel project as the current Cadesca deployment.
+1. Add `app.cadesca.com`, `auth.cadesca.com`, `studentclub.cadesca.com`, and `events.cadesca.com` to the same Vercel project as the current Cadesca deployment.
 2. Create the DNS record Vercel requests and wait for TLS issuance.
 3. Keep representative onboarding routes on `studentclub.cadesca.com` only.
 4. Keep all future representative login on `auth.cadesca.com/login`.
-5. Keep discovery, tickets, club tools, finance, and scanning on `app.cadesca.com`.
-6. Keep public-safe event canonicals on `cadesca.com/event/{slug}`.
+5. Keep student discovery and tickets on `app.cadesca.com`; keep club tools, finance, and scanning on `studentclub.cadesca.com`.
+6. Serve public event discovery from `events.cadesca.com` using the canonical `public.events` rows; keep public-safe detail canonicals on `cadesca.com/event/{slug}` until a coordinated canonical-domain change.
 7. Confirm the shared `.cadesca.com` cookie configuration works across auth, app, and student-club domains.
+8. Confirm the OAuth registry contains only exact production callbacks for Student Club and BilMatch. Never add wildcard callbacks.
 
 Use the exact CNAME value shown by the project domain inspector instead of assuming a generic target; Vercel documents the current subdomain flow in [Adding & Configuring a Custom Domain](https://vercel.com/docs/domains/working-with-domains/add-a-domain).
 

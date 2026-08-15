@@ -23,6 +23,10 @@ const STATUS_BODY = {
 
 const ROLE_COPY = {
   club_owner: "roleClubOwner",
+  club_admin: "roleClubAdmin",
+  event_manager: "roleEventManager",
+  content_manager: "roleContentManager",
+  club_member: "roleClubMember",
   event_organizer: "roleEventOrganizer",
   finance_manager: "roleFinanceManager",
   door_scanner: "roleDoorScanner"

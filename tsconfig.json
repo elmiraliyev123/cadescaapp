@@ -23,5 +23,11 @@
     }
   },
   "include": ["next-env.d.ts", "**/*.ts", "**/*.tsx", ".next/types/**/*.ts"],
-  "exclude": ["node_modules"]
+  "exclude": [
+    "node_modules",
+    "query-schema.ts",
+    "test-hash.ts",
+    "test-submit-2.ts",
+    "scripts/test-submit.ts"
+  ]
 }

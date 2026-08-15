@@ -308,6 +308,7 @@ function publicSiteOrigin(request: NextRequest) {
 
 function isAuthRoute(pathname: string) {
   return (
+    pathname === "/authorize" ||
     pathname === "/login" ||
     pathname === "/signup" ||
     pathname === "/verify-email" ||
@@ -327,6 +328,9 @@ function isClubWorkspacePath(pathname: string) {
 }
 
 function clubWorkspacePath(pathname: string) {
+  if (pathname === "/clubs") return "/app/club/clubs";
+  const selectedClub = pathname.match(/^\/clubs\/([0-9a-f-]{36})$/i);
+  if (selectedClub) return `/app/club?clubId=${encodeURIComponent(selectedClub[1])}`;
   if (pathname === "/dashboard") return "/app/club";
   if (pathname.startsWith("/dashboard/")) return `/app/club${pathname.slice("/dashboard".length)}`;
   return null;
@@ -436,6 +440,17 @@ export async function middleware(request: NextRequest) {
     );
   }
 
+  if (host === "events.cadesca.com") {
+    if (pathname === "/") {
+      const rewrite = request.nextUrl.clone();
+      rewrite.pathname = "/events";
+      return finalizeResponse(request, NextResponse.rewrite(rewrite));
+    }
+    if (pathname.startsWith("/app/") || isAuthRoute(pathname) || isStudentClubRoute(pathname)) {
+      return finalizeResponse(request, redirectTo(request, "/events"));
+    }
+  }
+
   if (isStaticBypass(pathname)) {
     return NextResponse.next();
   }
@@ -470,6 +485,12 @@ export async function middleware(request: NextRequest) {
       );
     }
 
+    if (pathname === "/auth/start" || pathname === "/auth/callback") {
+      const rewrite = request.nextUrl.clone();
+      rewrite.pathname = `/student-club${pathname}`;
+      return finalizeResponse(request, applyLocaleToResponse(NextResponse.rewrite(rewrite), localeResolution));
+    }
+
     if (isAuthRoute(pathname)) {
       const target = new URL(`${pathname}${request.nextUrl.search}`, authOrigin(request));
       return finalizeResponse(
@@ -479,12 +500,6 @@ export async function middleware(request: NextRequest) {
     }
 
     if (pathname === "/application") {
-      if (!(await hasStudentSession(request))) {
-        return finalizeResponse(
-          request,
-          applyLocaleToResponse(studentClubLoginRedirect(request, "/application"), localeResolution)
-        );
-      }
       const rewrite = request.nextUrl.clone();
       rewrite.pathname = "/student-club";
       return finalizeResponse(request, applyLocaleToResponse(NextResponse.rewrite(rewrite), localeResolution));
@@ -511,7 +526,9 @@ export async function middleware(request: NextRequest) {
         );
       }
       const rewrite = request.nextUrl.clone();
-      rewrite.pathname = workspacePath;
+      const [workspacePathname, workspaceSearch] = workspacePath.split("?");
+      rewrite.pathname = workspacePathname;
+      if (workspaceSearch) rewrite.search = `?${workspaceSearch}`;
       return finalizeResponse(request, applyLocaleToResponse(NextResponse.rewrite(rewrite), localeResolution));
     }
 

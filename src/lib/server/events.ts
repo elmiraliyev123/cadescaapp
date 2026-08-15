@@ -23,6 +23,12 @@ import { assertImageAllowed } from "@/lib/server/imageModeration";
 import { getCurrentStudentContext, isVerifiedUniversityStudent, type CurrentStudentContext } from "@/lib/server/social";
 import { getReadyPool } from "@/lib/server/users";
 import { getSupabaseAdminClient } from "@/lib/supabase/admin";
+import {
+  CLUB_ROLES,
+  hasClubCapability,
+  rolesWithClubCapability,
+  type ClubCapability
+} from "@/lib/clubs/permissions";
 
 const EVENT_ASSET_BUCKET = "event-assets";
 const MAX_EVENT_COVER_BYTES = 10 * 1024 * 1024;
@@ -34,7 +40,7 @@ const EVENT_IMAGE_MIME_EXTENSIONS: Record<string, string> = {
   "image/png": "png",
   "image/webp": "webp"
 };
-const EVENT_ROLES: ClubRole[] = ["club_owner", "event_organizer", "finance_manager", "door_scanner"];
+const EVENT_ROLES: ClubRole[] = [...CLUB_ROLES];
 
 export type EventsErrorCode =
   | "authentication_required"
@@ -56,6 +62,7 @@ export type EventsErrorCode =
   | "event_image_invalid"
   | "event_image_too_large"
   | "event_image_upload_failed"
+  | "capacity_below_confirmed"
   | "database_unavailable";
 
 export class EventsError extends Error {
@@ -102,6 +109,8 @@ type EventRow = {
   featured_status: EventDiscoveryItem["featuredStatus"];
   featured_until: Date | string | null;
   published_at: Date | string | null;
+  moderation_status: "active" | "platform_suspended";
+  visibility: "public" | "university" | "private";
 };
 
 type TicketRow = {
@@ -229,7 +238,8 @@ function mapEvent(row: EventRow): EventDiscoveryItem {
     status: row.status === "sold_out" && availableSlots > 0 ? "published" : row.status,
     featuredStatus: row.featured_status,
     featuredUntil: toIso(row.featured_until),
-    publishedAt: toIso(row.published_at)
+    publishedAt: toIso(row.published_at),
+    moderationStatus: row.moderation_status
   };
 }
 
@@ -336,9 +346,9 @@ async function activeClubRoles(userId: string, clubId: string) {
   return result.rows.map((row) => row.role);
 }
 
-async function requireClubRole(userId: string, clubId: string, allowed: ClubRole[]) {
+async function requireClubCapability(userId: string, clubId: string, capability: ClubCapability) {
   const roles = await activeClubRoles(userId, clubId);
-  if (!roles.some((role) => allowed.includes(role))) throw new EventsError("club_access_denied", 403);
+  if (!hasClubCapability(roles, capability)) throw new EventsError("club_access_denied", 403);
   return roles;
 }
 
@@ -374,7 +384,9 @@ const EVENT_SELECT = `
     event.status,
     event.featured_status,
     event.featured_until,
-    event.published_at
+    event.published_at,
+    event.moderation_status,
+    event.visibility
   from public.events event
   join public.student_clubs club on club.id = event.club_id
   join public.universities university on university.id = event.university_id
@@ -400,7 +412,8 @@ export async function listDiscoverableEvents(options: {
   includeSoldOut?: boolean;
 } = {}): Promise<EventDiscoveryItem[]> {
   const user = await getCurrentStudentContext();
-  const universityId = isVerifiedUniversityStudent(user) ? user.universityId : null;
+  if (!isVerifiedUniversityStudent(user)) throw new EventsError("verified_student_required", 403);
+  const universityId = user.universityId;
   const query = normalizeSearch(options.query);
   const limit = Math.max(1, Math.min(100, options.limit || 40));
   const pool = await getReadyPool();
@@ -409,9 +422,18 @@ export async function listDiscoverableEvents(options: {
     `${EVENT_SELECT}
       where club.status = 'approved'
         and event.status = any($1::text[])
+        and event.moderation_status = 'active'
         and event.start_at > now()
-        and ($2::uuid is null or event.university_id = $2::uuid)
-        and ($3::text = '' or event.title ilike '%' || $3 || '%' or club.name ilike '%' || $3 || '%' or event.location ilike '%' || $3 || '%')
+        and (event.visibility = 'public' or (event.visibility = 'university' and event.university_id = $2::uuid))
+        and ($3::text = ''
+          or event.title ilike '%' || $3 || '%'
+          or event.description ilike '%' || $3 || '%'
+          or club.name ilike '%' || $3 || '%'
+          or university.name ilike '%' || $3 || '%'
+          or event.location ilike '%' || $3 || '%'
+          or coalesce(event.venue_name, '') ilike '%' || $3 || '%'
+          or coalesce(event.venue_address, '') ilike '%' || $3 || '%'
+          or exists (select 1 from unnest(event.tags) tag where tag ilike '%' || $3 || '%'))
         and ($4::boolean = false or (
           event.featured_status = 'approved'
           and event.featured_at is not null
@@ -427,6 +449,45 @@ export async function listDiscoverableEvents(options: {
   return result.rows.map(mapEvent);
 }
 
+export async function listPublicDiscoverableEvents(options: {
+  query?: string;
+  featured?: boolean;
+  limit?: number;
+  includeSoldOut?: boolean;
+} = {}): Promise<EventDiscoveryItem[]> {
+  const query = normalizeSearch(options.query);
+  const limit = Math.max(1, Math.min(100, options.limit || 40));
+  const pool = await getReadyPool();
+  const result = await pool.query<EventRow>(
+    `${EVENT_SELECT}
+      where club.status = 'approved'
+        and event.status = any($1::text[])
+        and event.moderation_status = 'active'
+        and event.visibility = 'public'
+        and event.start_at > now()
+        and ($2::text = ''
+          or event.title ilike '%' || $2 || '%'
+          or event.description ilike '%' || $2 || '%'
+          or club.name ilike '%' || $2 || '%'
+          or university.name ilike '%' || $2 || '%'
+          or event.location ilike '%' || $2 || '%'
+          or coalesce(event.venue_name, '') ilike '%' || $2 || '%'
+          or coalesce(event.venue_address, '') ilike '%' || $2 || '%'
+          or exists (select 1 from unnest(event.tags) tag where tag ilike '%' || $2 || '%'))
+        and ($3::boolean = false or (
+          event.featured_status = 'approved'
+          and event.featured_at is not null
+          and (event.featured_until is null or event.featured_until > now())
+        ))
+      order by
+        (event.featured_status = 'approved' and (event.featured_until is null or event.featured_until > now())) desc,
+        event.start_at asc
+      limit $4`,
+    [options.includeSoldOut === false ? ["published"] : ["published", "sold_out"], query, Boolean(options.featured), limit]
+  );
+  return result.rows.map(mapEvent);
+}
+
 export async function countPublicEventSitemapEntries() {
   const pool = await getReadyPool();
   const result = await pool.query<{ count: number }>(
@@ -434,6 +495,8 @@ export async function countPublicEventSitemapEntries() {
        from public.events event
        join public.student_clubs club on club.id = event.club_id
       where event.status in ('published', 'sold_out')
+        and event.moderation_status = 'active'
+        and event.visibility = 'public'
         and club.status = 'approved'
         and event.start_at > now()`
   );
@@ -447,6 +510,8 @@ export async function listPublicEventSitemapEntries(input: { limit: number; offs
        from public.events event
        join public.student_clubs club on club.id = event.club_id
       where event.status in ('published', 'sold_out')
+        and event.moderation_status = 'active'
+        and event.visibility = 'public'
         and club.status = 'approved'
         and event.start_at > now()
       order by event.updated_at desc, event.id desc
@@ -456,9 +521,10 @@ export async function listPublicEventSitemapEntries(input: { limit: number; offs
   return result.rows.map((row) => ({ slug: row.slug, updatedAt: toIso(row.updated_at) }));
 }
 
-export async function getDiscoverableEventBySlug(slug: string): Promise<EventDetail | null> {
+export async function getDiscoverableEventBySlug(slug: string, publicOnly = false): Promise<EventDetail | null> {
   const user = await getCurrentStudentContext();
   const userId = user?.status === "active" ? user.id : null;
+  const universityId = isVerifiedUniversityStudent(user) ? user.universityId : null;
   const pool = await getReadyPool();
   const result = await pool.query<EventRow & {
     already_requested: boolean;
@@ -476,8 +542,13 @@ export async function getDiscoverableEventBySlug(slug: string): Promise<EventDet
       where event.slug = $1
         and club.status = 'approved'
         and event.status = any($3::text[])
+        and event.moderation_status = 'active'
+        and (
+          (event.visibility = 'public')
+          or ($4::boolean = false and $5::uuid is not null and event.visibility = 'university' and event.university_id = $5::uuid)
+        )
       limit 1`,
-    [slug.trim().toLowerCase(), userId, ["published", "sold_out", "cancelled", "completed"]]
+    [slug.trim().toLowerCase(), userId, ["published", "sold_out", "cancelled", "completed"], publicOnly, universityId]
   );
 
   const row = result.rows[0];
@@ -602,8 +673,8 @@ export async function getCurrentClubDashboard(
   const club = await resolveClubForUser(user, clubId);
   const roles = await activeClubRoles(user.id, club.id);
   const pool = await getReadyPool();
-  const canViewMembers = roles.includes("club_owner");
-  const canManageEvents = roles.some((role) => role === "club_owner" || role === "event_organizer");
+  const canViewMembers = hasClubCapability(roles, "club.members.manage");
+  const canManageEvents = hasClubCapability(roles, "club.events.update");
 
   type MemberRow = {
       id: string;
@@ -778,12 +849,12 @@ export async function getClubEventOperations(eventId: string): Promise<ClubEvent
   const event = eventResult.rows[0];
   if (!event) throw new EventsError("event_not_found", 404);
   const roles = await activeClubRoles(user.id, event.club_id);
-  if (!roles.some((role) => role === "club_owner" || role === "event_organizer")) {
+  if (!hasClubCapability(roles, "club.events.manage_attendees")) {
     throw new EventsError("club_access_denied", 403);
   }
-  const mayViewAudit = roles.includes("club_owner");
+  const mayViewAudit = hasClubCapability(roles, "club.audit.view");
 
-  const [attendeesResult, scannersResult, auditResult] = await Promise.all([
+  const [attendeesResult, scannersResult, auditResult, galleryResult] = await Promise.all([
     pool.query<{
       ticket_id: string;
       display_name: string;
@@ -859,8 +930,21 @@ export async function getClubEventOperations(eventId: string): Promise<ClubEvent
       action: string;
       actor_display_name: string | null;
       created_at: Date | string;
-    }> })
+    }> }),
+    pool.query<{ id: string; object_path: string; alt_text: string | null; sort_order: number }>(
+      `select id, object_path, alt_text, sort_order
+         from public.event_images
+        where event_id = $1::uuid
+        order by sort_order asc, created_at asc`,
+      [eventId]
+    )
   ]);
+
+  const galleryPaths = galleryResult.rows.map((image) => image.object_path);
+  const signedGallery = galleryPaths.length
+    ? await getSupabaseAdminClient().storage.from(EVENT_ASSET_BUCKET).createSignedUrls(galleryPaths, 60 * 60)
+    : { data: [] as Array<{ path: string; signedUrl: string; error: string | null }> };
+  const galleryUrls = new Map((signedGallery.data || []).map((entry) => [entry.path, entry.signedUrl]));
 
   return {
     attendees: attendeesResult.rows.map((row): ClubEventAttendee => ({
@@ -888,7 +972,11 @@ export async function getClubEventOperations(eventId: string): Promise<ClubEvent
       action: row.action,
       actorDisplayName: row.actor_display_name,
       createdAt: toIso(row.created_at) || ""
-    }))
+    })),
+    gallery: galleryResult.rows.flatMap((image) => {
+      const url = galleryUrls.get(image.object_path);
+      return url ? [{ id: image.id, url, altText: image.alt_text, sortOrder: image.sort_order }] : [];
+    })
   };
 }
 
@@ -896,7 +984,7 @@ export async function listClubFinanceTickets(clubId?: string): Promise<ClubFinan
   const user = await currentStudentRequired();
   const club = await resolveClubForUser(user, clubId);
   const roles = await activeClubRoles(user.id, club.id);
-  if (!roles.some((role) => role === "club_owner" || role === "finance_manager")) {
+  if (!hasClubCapability(roles, "club.events.manage_finance")) {
     throw new EventsError("finance_access_denied", 403);
   }
 
@@ -954,7 +1042,7 @@ export async function listClubFinanceTickets(clubId?: string): Promise<ClubFinan
       order by
         (ticket.payment_status in ('under_review', 'clarification_requested', 'pending')) desc,
         ticket.created_at desc`,
-    [club.id, roles.some((role) => role === "club_owner" || role === "event_organizer")]
+    [club.id, hasClubCapability(roles, "club.events.manage_attendees")]
   );
 
   return result.rows.map((row) => ({
@@ -1138,6 +1226,103 @@ async function uploadEventCover(eventId: string, file: File) {
   return objectPath;
 }
 
+async function uploadEventGalleryObject(eventId: string, file: File) {
+  const extension = validateEventCover(file);
+  await assertImageAllowed(file, "event_cover");
+  const objectPath = `events/${eventId}/gallery-${crypto.randomUUID()}.${extension}`;
+  const { error } = await getSupabaseAdminClient().storage.from(EVENT_ASSET_BUCKET).upload(objectPath, file, {
+    cacheControl: "3600",
+    contentType: file.type || `image/${extension === "jpg" ? "jpeg" : extension}`,
+    upsert: false
+  });
+  if (error) throw new EventsError("event_image_upload_failed", 502);
+  return objectPath;
+}
+
+export async function addEventGalleryImage(eventId: string, file: File, altTextInput?: string | null) {
+  const user = await currentStudentRequired();
+  if (!file?.size) throw new EventsError("event_image_invalid", 422);
+  const pool = await getReadyPool();
+  const eventResult = await pool.query<{ club_id: string; university_id: string; moderation_status: string }>(
+    `select club_id, university_id, moderation_status from public.events where id = $1::uuid limit 1`,
+    [eventId]
+  );
+  const event = eventResult.rows[0];
+  if (!event) throw new EventsError("event_not_found", 404);
+  await requireClubCapability(user.id, event.club_id, "club.events.update");
+  if (event.moderation_status !== "active") throw new EventsError("event_not_editable", 409);
+  const objectPath = await uploadEventGalleryObject(eventId, file);
+  const client = await pool.connect();
+  try {
+    await client.query("begin");
+    const result = await client.query<{ id: string }>(
+      `insert into public.event_images (event_id, object_path, alt_text, sort_order, created_by)
+       select $1::uuid, $2, $3, coalesce(max(sort_order) + 1, 0), $4
+         from public.event_images
+        where event_id = $1::uuid
+       returning id`,
+      [eventId, objectPath, altTextInput?.trim().slice(0, 240) || null, user.id]
+    );
+    await client.query(
+      `insert into public.event_audit_logs (university_id, club_id, event_id, actor_user_id, action, metadata)
+       values ($1, $2, $3, $4, 'event_image_added', jsonb_build_object('image_id', $5::text))`,
+      [event.university_id, event.club_id, eventId, user.id, result.rows[0]?.id]
+    );
+    await client.query("commit");
+    return result.rows[0]?.id;
+  } catch (error) {
+    await client.query("rollback").catch(() => undefined);
+    await getSupabaseAdminClient().storage.from(EVENT_ASSET_BUCKET).remove([objectPath]).catch(() => undefined);
+    throw error;
+  } finally {
+    client.release();
+  }
+}
+
+export async function deleteEventGalleryImage(eventId: string, imageId: string) {
+  const user = await currentStudentRequired();
+  const pool = await getReadyPool();
+  const client = await pool.connect();
+  let objectPath: string | null = null;
+  try {
+    await client.query("begin");
+    const imageResult = await client.query<{ object_path: string; club_id: string; university_id: string; moderation_status: string }>(
+      `select image.object_path, event.club_id, event.university_id, event.moderation_status
+         from public.event_images image
+         join public.events event on event.id = image.event_id
+        where image.id = $1::uuid and image.event_id = $2::uuid
+        for update of image`,
+      [imageId, eventId]
+    );
+    const image = imageResult.rows[0];
+    if (!image) throw new EventsError("event_not_found", 404);
+    const membership = await client.query(
+      `select id from public.club_memberships
+        where club_id = $1::uuid and user_id = $2 and status = 'active' and role = any($3::text[])
+        limit 1 for share`,
+      [image.club_id, user.id, rolesWithClubCapability("club.events.update")]
+    );
+    if (!membership.rows[0]) throw new EventsError("club_access_denied", 403);
+    if (image.moderation_status !== "active") throw new EventsError("event_not_editable", 409);
+    await client.query(`delete from public.event_images where id = $1::uuid`, [imageId]);
+    await client.query(
+      `insert into public.event_audit_logs (university_id, club_id, event_id, actor_user_id, action, metadata)
+       values ($1, $2, $3, $4, 'event_image_deleted', jsonb_build_object('image_id', $5::text))`,
+      [image.university_id, image.club_id, eventId, user.id, imageId]
+    );
+    await client.query("commit");
+    objectPath = image.object_path;
+  } catch (error) {
+    await client.query("rollback").catch(() => undefined);
+    throw error;
+  } finally {
+    client.release();
+  }
+  if (objectPath && !objectPath.includes("..") && !objectPath.startsWith("/")) {
+    await getSupabaseAdminClient().storage.from(EVENT_ASSET_BUCKET).remove([objectPath]).catch(() => undefined);
+  }
+}
+
 export async function createEventDraft(clubId: string, input: EventDraftInput, cover?: File | null) {
   const user = await currentStudentRequired();
   const normalized = validateEventDraft(input);
@@ -1164,10 +1349,10 @@ export async function createEventDraft(clubId: string, input: EventDraftInput, c
         where club_id = $1::uuid
           and user_id = $2
           and status = 'active'
-          and role in ('club_owner', 'event_organizer')
+          and role = any($3::text[])
         limit 1
         for share`,
-      [clubId, user.id]
+      [clubId, user.id, rolesWithClubCapability("club.events.create")]
     );
     if (!membership.rows[0]) throw new EventsError("club_access_denied", 403);
 
@@ -1250,7 +1435,7 @@ export async function updateEventDraft(eventId: string, input: EventDraftInput, 
   );
   const event = eventResult.rows[0];
   if (!event) throw new EventsError("event_not_found", 404);
-  await requireClubRole(user.id, event.club_id, ["club_owner", "event_organizer"]);
+  await requireClubCapability(user.id, event.club_id, "club.events.update");
   if (!(["draft", "rejected"] as EventStatus[]).includes(event.status)) throw new EventsError("event_not_editable", 409);
   const normalized = validateEventDraft(input);
   const uploadedObjectPath = cover?.size ? await uploadEventCover(eventId, cover) : null;
@@ -1269,10 +1454,10 @@ export async function updateEventDraft(eventId: string, input: EventDraftInput, 
         where club_id = $1::uuid
           and user_id = $2
           and status = 'active'
-          and role in ('club_owner', 'event_organizer')
+          and role = any($3::text[])
         limit 1
         for share`,
-      [event.club_id, user.id]
+      [event.club_id, user.id, rolesWithClubCapability("club.events.update")]
     );
     if (!membership.rows[0]) throw new EventsError("club_access_denied", 403);
     const currentEvent = await client.query<{ status: EventStatus; club_id: string }>(
@@ -1384,10 +1569,10 @@ export async function submitEventForReview(eventId: string) {
         where club_id = $1::uuid
           and user_id = $2
           and status = 'active'
-          and role in ('club_owner', 'event_organizer')
+          and role = any($3::text[])
         limit 1
         for share`,
-      [initial.rows[0].club_id, user.id]
+      [initial.rows[0].club_id, user.id, rolesWithClubCapability("club.events.publish")]
     );
     if (!membership.rows[0]) throw new EventsError("club_access_denied", 403);
     const eventResult = await client.query<{
@@ -1398,8 +1583,9 @@ export async function submitEventForReview(eventId: string) {
       cover_image_url: string | null;
       start_at: Date | string;
       ticket_request_deadline: Date | string;
+      moderation_status: "active" | "platform_suspended";
     }>(
-      `select id, club_id, university_id, status, cover_image_url, start_at, ticket_request_deadline
+      `select id, club_id, university_id, status, cover_image_url, start_at, ticket_request_deadline, moderation_status
          from public.events
         where id = $1::uuid
         for update`,
@@ -1407,6 +1593,7 @@ export async function submitEventForReview(eventId: string) {
     );
     const event = eventResult.rows[0];
     if (!event || event.club_id !== initial.rows[0].club_id) throw new EventsError("event_not_found", 404);
+    if (event.moderation_status !== "active") throw new EventsError("event_not_editable", 409);
     if (event.status !== "draft") throw new EventsError("event_not_editable", 409);
     const submitted = await client.query(
       `update public.events
@@ -1457,18 +1644,20 @@ export async function cancelClubEvent(eventId: string) {
         where club_id = $1::uuid
           and user_id = $2
           and status = 'active'
-          and role in ('club_owner', 'event_organizer')
+          and role = any($3::text[])
         limit 1
         for share`,
-      [initial.rows[0].club_id, actor.id]
+      [initial.rows[0].club_id, actor.id, rolesWithClubCapability("club.events.cancel")]
     );
     if (!membership.rows[0]) throw new EventsError("club_access_denied", 403);
     const eventResult = await client.query<{
       club_id: string;
       university_id: string;
       status: EventStatus;
+      title: string;
+      slug: string;
     }>(
-      `select club_id, university_id, status from public.events where id = $1::uuid for update`,
+      `select club_id, university_id, status, title, slug from public.events where id = $1::uuid for update`,
       [eventId]
     );
     const event = eventResult.rows[0];
@@ -1575,6 +1764,172 @@ export async function cancelClubEvent(eventId: string) {
         Number(refundRequired.rows[0]?.count || 0)
       ]
     );
+    await client.query(
+      `insert into public.notifications (user_id, type, title, body, href, actor_type, actor_id, metadata)
+       select distinct ticket.user_id,
+              'event_cancelled',
+              'Event cancelled',
+              $2,
+              '/app/user/tickets',
+              'club',
+              $3::text,
+              jsonb_build_object('event_id', $1::text)
+         from public.event_tickets ticket
+        where ticket.event_id = $1::uuid
+          and ticket.user_id <> $4`,
+      [eventId, event.title, event.club_id, actor.id]
+    );
+    await client.query("commit");
+  } catch (error) {
+    await client.query("rollback").catch(() => undefined);
+    throw error;
+  } finally {
+    client.release();
+  }
+}
+
+export async function deleteClubEventDraft(eventId: string) {
+  const actor = await currentStudentRequired();
+  const pool = await getReadyPool();
+  const client = await pool.connect();
+  let objectsToDelete: string[] = [];
+  try {
+    await client.query("begin");
+    const eventResult = await client.query<{
+      club_id: string;
+      university_id: string;
+      status: EventStatus;
+      cover_image_url: string | null;
+      moderation_status: "active" | "platform_suspended";
+    }>(
+      `select club_id, university_id, status, cover_image_url, moderation_status
+         from public.events
+        where id = $1::uuid
+        for update`,
+      [eventId]
+    );
+    const event = eventResult.rows[0];
+    if (!event) throw new EventsError("event_not_found", 404);
+    if (event.status !== "draft" || event.moderation_status !== "active") throw new EventsError("event_not_editable", 409);
+    const membership = await client.query(
+      `select id from public.club_memberships
+        where club_id = $1::uuid
+          and user_id = $2
+          and status = 'active'
+          and role = any($3::text[])
+        limit 1 for share`,
+      [event.club_id, actor.id, rolesWithClubCapability("club.events.cancel")]
+    );
+    if (!membership.rows[0]) throw new EventsError("club_access_denied", 403);
+    const gallery = await client.query<{ object_path: string }>(
+      `select object_path from public.event_images where event_id = $1::uuid`,
+      [eventId]
+    );
+    objectsToDelete = [event.cover_image_url, ...gallery.rows.map((image) => image.object_path)]
+      .filter((value): value is string => Boolean(value && !value.includes("..") && !value.startsWith("/")));
+    await client.query(
+      `insert into public.event_audit_logs (university_id, club_id, event_id, actor_user_id, action, metadata)
+       values ($1, $2, $3, $4, 'event_deleted', jsonb_build_object('event_id', $3::text, 'lifecycle_status', 'draft'))`,
+      [event.university_id, event.club_id, eventId, actor.id]
+    );
+    const deleted = await client.query(`delete from public.events where id = $1::uuid and status = 'draft'`, [eventId]);
+    if (deleted.rowCount !== 1) throw new EventsError("event_not_editable", 409);
+    await client.query("commit");
+  } catch (error) {
+    await client.query("rollback").catch(() => undefined);
+    throw error;
+  } finally {
+    client.release();
+  }
+  if (objectsToDelete.length) {
+    await getSupabaseAdminClient().storage.from(EVENT_ASSET_BUCKET).remove(objectsToDelete).catch(() => undefined);
+  }
+}
+
+export async function updateEventCapacity(eventId: string, requestedCapacity: number) {
+  const capacity = Number(requestedCapacity);
+  if (!Number.isInteger(capacity) || capacity < 1 || capacity > 100_000) {
+    throw new EventsError("event_invalid", 422);
+  }
+  const actor = await currentStudentRequired();
+  const pool = await getReadyPool();
+  const client = await pool.connect();
+  try {
+    await client.query("begin");
+    await client.query(`select pg_advisory_xact_lock(hashtextextended($1::text, 0))`, [eventId]);
+    const eventResult = await client.query<{
+      club_id: string;
+      university_id: string;
+      capacity: number;
+      status: EventStatus;
+      moderation_status: string;
+    }>(
+      `select event.club_id, event.university_id, event.capacity, event.status, event.moderation_status
+         from public.events event
+         join public.student_clubs club on club.id = event.club_id
+        where event.id = $1::uuid
+          and club.status = 'approved'
+        for update of event`,
+      [eventId]
+    );
+    const event = eventResult.rows[0];
+    if (!event) throw new EventsError("event_not_found", 404);
+    if (event.moderation_status !== "active") throw new EventsError("event_not_editable", 409);
+    if (!("draft pending_review published sold_out rejected".split(" ") as EventStatus[]).includes(event.status)) {
+      throw new EventsError("event_not_editable", 409);
+    }
+    const membership = await client.query<{ id: string }>(
+      `select id from public.club_memberships
+        where club_id = $1::uuid
+          and user_id = $2
+          and status = 'active'
+          and role = any($3::text[])
+        limit 1
+        for share`,
+      [event.club_id, actor.id, rolesWithClubCapability("club.events.update")]
+    );
+    if (!membership.rows[0]) throw new EventsError("club_access_denied", 403);
+    await client.query(`select * from private.expire_event_reservations($1::uuid)`, [eventId]);
+    const consumedResult = await client.query<{ consumed: number }>(
+      `select count(*)::int as consumed
+         from public.event_tickets ticket
+        where ticket.event_id = $1::uuid
+          and (
+            ticket.ticket_status in ('active', 'checked_in')
+            or ticket.reservation_status = 'held_for_review'
+            or (
+              ticket.reservation_status = 'active'
+              and ticket.reservation_expires_at is not null
+              and ticket.reservation_expires_at > now()
+            )
+          )`,
+      [eventId]
+    );
+    const consumed = Number(consumedResult.rows[0]?.consumed || 0);
+    if (capacity < consumed) throw new EventsError("capacity_below_confirmed", 409);
+    await client.query(
+      `update public.events
+          set capacity = $2,
+              status = case
+                when status in ('published', 'sold_out') and $2 <= $3 then 'sold_out'
+                when status = 'sold_out' and $2 > $3 then 'published'
+                else status
+              end,
+              updated_by = $4,
+              updated_at = now()
+        where id = $1::uuid`,
+      [eventId, capacity, consumed, actor.id]
+    );
+    await client.query(
+      `insert into public.event_audit_logs (
+         university_id, club_id, event_id, actor_user_id, action, metadata
+       ) values ($1, $2, $3, $4, 'quota_changed', jsonb_build_object(
+         'previous_capacity', $5::int,
+         'new_capacity', $6::int,
+         'consumed_capacity', $7::int
+       ))`,
+      [event.university_id, event.club_id, eventId, actor.id, event.capacity, capacity, consumed]
+    );
     await client.query("commit");
   } catch (error) {
     await client.query("rollback").catch(() => undefined);
@@ -1588,8 +1943,12 @@ export async function listAdminEventModeration() {
   const pool = await getReadyPool();
   const result = await pool.query<EventRow>(
     `${EVENT_SELECT}
-      where event.status in ('pending_review', 'published', 'rejected', 'cancelled')
-      order by (event.status = 'pending_review') desc, event.submitted_at desc nulls last, event.created_at desc`
+      where event.status in ('pending_review', 'published', 'sold_out', 'rejected', 'cancelled')
+         or event.moderation_status = 'platform_suspended'
+      order by (event.moderation_status = 'platform_suspended') desc,
+               (event.status = 'pending_review') desc,
+               event.submitted_at desc nulls last,
+               event.created_at desc`
   );
   return result.rows.map(mapEvent);
 }
@@ -1622,9 +1981,10 @@ export async function reviewEventAsAdmin(input: {
       start_at: Date;
       ticket_request_deadline: Date;
       cover_image_url: string | null;
+      moderation_status: "active" | "platform_suspended";
     }>(
       `select event.id, event.club_id, event.university_id, event.status, event.start_at,
-              event.ticket_request_deadline, event.cover_image_url
+              event.ticket_request_deadline, event.cover_image_url, event.moderation_status
          from public.events event
         where event.id = $1::uuid
           and event.club_id = $2::uuid
@@ -1633,6 +1993,7 @@ export async function reviewEventAsAdmin(input: {
     );
     const event = result.rows[0];
     if (!event) throw new EventsError("event_not_found", 404);
+    if (event.moderation_status !== "active") throw new EventsError("event_not_editable", 409);
     if (event.status !== "pending_review") throw new EventsError("event_not_editable", 409);
     if (
       input.action === "approve" && (
@@ -1704,6 +2065,7 @@ export async function setEventFeaturedAsAdmin(input: {
         where event.id = $1::uuid
           and event.club_id = $2::uuid
           and event.status = 'published'
+          and event.moderation_status = 'active'
           and event.start_at > now()
         for update`,
       [input.eventId, initial.rows[0].club_id]
@@ -1733,6 +2095,65 @@ export async function setEventFeaturedAsAdmin(input: {
   }
 }
 
+export async function setEventModerationAsAdmin(input: {
+  eventId: string;
+  suspended: boolean;
+  adminEmail: string;
+  reason?: string | null;
+}) {
+  const reason = (input.reason || "").trim().slice(0, 1000);
+  if (input.suspended && reason.length < 2) throw new EventsError("event_invalid", 422);
+  const pool = await getReadyPool();
+  const client = await pool.connect();
+  try {
+    await client.query("begin");
+    const result = await client.query<{ club_id: string; university_id: string; moderation_status: string }>(
+      `select club_id, university_id, moderation_status
+         from public.events
+        where id = $1::uuid
+        for update`,
+      [input.eventId]
+    );
+    const event = result.rows[0];
+    if (!event) throw new EventsError("event_not_found", 404);
+    const nextStatus = input.suspended ? "platform_suspended" : "active";
+    if (event.moderation_status === nextStatus) throw new EventsError("event_not_editable", 409);
+    await client.query(
+      `update public.events
+          set moderation_status = $2,
+              moderation_reason = $3,
+              moderated_at = now(),
+              moderated_by = encode(digest(lower($4), 'sha256'), 'hex'),
+              featured_status = case when $2 = 'platform_suspended' then 'expired' else featured_status end,
+              featured_until = case when $2 = 'platform_suspended' then now() else featured_until end,
+              updated_at = now()
+        where id = $1::uuid`,
+      [input.eventId, nextStatus, input.suspended ? reason : null, input.adminEmail]
+    );
+    await client.query(
+      `insert into public.event_audit_logs (university_id, club_id, event_id, action, metadata)
+       values ($1, $2, $3, $4, jsonb_build_object(
+         'admin_email_hash', encode(digest(lower($5), 'sha256'), 'hex'),
+         'has_reason', $6::boolean
+       ))`,
+      [
+        event.university_id,
+        event.club_id,
+        input.eventId,
+        input.suspended ? "platform_suspended" : "platform_suspension_lifted",
+        input.adminEmail,
+        Boolean(reason)
+      ]
+    );
+    await client.query("commit");
+  } catch (error) {
+    await client.query("rollback").catch(() => undefined);
+    throw error;
+  } finally {
+    client.release();
+  }
+}
+
 export async function inviteClubMember(input: {
   clubId: string;
   usernameOrEmail: string;
@@ -1740,7 +2161,7 @@ export async function inviteClubMember(input: {
 }) {
   const actor = await currentStudentRequired();
   const identifier = input.usernameOrEmail.trim().replace(/^@/, "").toLowerCase();
-  if (!identifier || !(["event_organizer", "finance_manager", "door_scanner"] as ClubRole[]).includes(input.role)) {
+  if (!identifier || !CLUB_ROLES.includes(input.role)) {
     throw new EventsError("club_member_invalid", 422);
   }
   const pool = await getReadyPool();
@@ -1758,11 +2179,11 @@ export async function inviteClubMember(input: {
          from public.club_memberships
         where club_id = $1::uuid
           and user_id = $2
-          and role = 'club_owner'
+          and role = any($3::text[])
           and status = 'active'
         limit 1
         for share`,
-      [input.clubId, actor.id]
+      [input.clubId, actor.id, rolesWithClubCapability("club.roles.manage")]
     );
     if (!actorMembership.rows[0]) throw new EventsError("club_access_denied", 403);
     const userResult = await client.query<{ id: string }>(
@@ -1794,6 +2215,12 @@ export async function inviteClubMember(input: {
       `insert into public.event_audit_logs (university_id, club_id, actor_user_id, action, metadata)
        values ($1, $2, $3, 'member_invited', jsonb_build_object('membership_id', $4::text, 'role', $5::text))`,
       [club.university_id, input.clubId, actor.id, membership.rows[0]?.id, input.role]
+    );
+    await client.query(
+      `insert into public.notifications (user_id, type, title, body, href, actor_type, actor_id, metadata)
+       values ($1, 'club_role_invitation', 'Club role invitation', $2, '/app/user/club', 'club', $3::text,
+               jsonb_build_object('membership_id', $4::text, 'role', $5::text))`,
+      [target.id, input.role.replaceAll("_", " "), input.clubId, membership.rows[0]?.id, input.role]
     );
     await client.query("commit");
     return membership.rows[0]?.id || null;
@@ -1861,10 +2288,13 @@ export async function revokeClubMembership(clubId: string, membershipId: string)
     const actorMembership = await client.query<{ id: string }>(
       `select id
          from public.club_memberships
-        where club_id = $1::uuid and user_id = $2 and role = 'club_owner' and status = 'active'
+        where club_id = $1::uuid
+          and user_id = $2
+          and role = any($3::text[])
+          and status = 'active'
         limit 1
         for share`,
-      [clubId, actor.id]
+      [clubId, actor.id, rolesWithClubCapability("club.roles.manage")]
     );
     if (!actorMembership.rows[0]) throw new EventsError("club_access_denied", 403);
     const result = await client.query<{ user_id: string; role: ClubRole }>(
@@ -1888,6 +2318,12 @@ export async function revokeClubMembership(clubId: string, membershipId: string)
       `insert into public.event_audit_logs (university_id, club_id, actor_user_id, action, metadata)
        values ($1, $2, $3, 'role_revoked', jsonb_build_object('membership_id', $4::text, 'role', $5::text))`,
       [club.rows[0].university_id, clubId, actor.id, membershipId, result.rows[0].role]
+    );
+    await client.query(
+      `insert into public.notifications (user_id, type, title, body, href, actor_type, actor_id, metadata)
+       values ($1, 'club_role_changed', 'Club access updated', 'A club role was removed from your account.',
+               '/app/user/club', 'club', $2::text, jsonb_build_object('role', $3::text))`,
+      [result.rows[0].user_id, clubId, result.rows[0].role]
     );
     await client.query("commit");
   } catch (error) {
@@ -1920,10 +2356,10 @@ export async function assignScannerToEvent(eventId: string, scannerUserId: strin
         where club_id = $1::uuid
           and user_id = $2
           and status = 'active'
-          and role in ('club_owner', 'event_organizer')
+          and role = any($3::text[])
         limit 1
         for share`,
-      [initial.rows[0].club_id, actor.id]
+      [initial.rows[0].club_id, actor.id, rolesWithClubCapability("club.events.manage_attendees")]
     );
     if (!actorMembership.rows[0]) throw new EventsError("club_access_denied", 403);
     const eventResult = await client.query<{ club_id: string; university_id: string }>(
@@ -1991,10 +2427,10 @@ export async function revokeScannerFromEvent(eventId: string, scannerUserId: str
         where club_id = $1::uuid
           and user_id = $2
           and status = 'active'
-          and role in ('club_owner', 'event_organizer')
+          and role = any($3::text[])
         limit 1
         for share`,
-      [initial.rows[0].club_id, actor.id]
+      [initial.rows[0].club_id, actor.id, rolesWithClubCapability("club.events.manage_attendees")]
     );
     if (!actorMembership.rows[0]) throw new EventsError("club_access_denied", 403);
     const eventResult = await client.query<{ club_id: string }>(

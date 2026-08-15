@@ -51,6 +51,7 @@ export type EventPresentationError =
   | "event_image_invalid"
   | "event_image_too_large"
   | "event_image_upload_failed"
+  | "capacity_below_confirmed"
   | "database_unavailable"
   | "event_unavailable"
   | "ticket_not_found"
@@ -235,6 +236,10 @@ const statusEn: Record<EventPresentationStatus, string> = {
   suspended: "Suspended",
   archived: "Archived",
   club_owner: "Club owner",
+  club_admin: "Club admin",
+  event_manager: "Event manager",
+  content_manager: "Content manager",
+  club_member: "Member",
   event_organizer: "Event organizer",
   finance_manager: "Finance manager",
   door_scanner: "Door scanner",
@@ -299,6 +304,7 @@ const errorsEn: Record<EventPresentationError, string> = {
   event_image_invalid: "Use a JPG, PNG, WebP, or AVIF cover image.",
   event_image_too_large: "The cover image is too large.",
   event_image_upload_failed: "The cover image could not be uploaded.",
+  capacity_below_confirmed: "Capacity cannot be lower than confirmed or held reservations.",
   database_unavailable: "Events are temporarily unavailable.",
   event_unavailable: "Ticket requests are closed for this event.",
   ticket_not_found: "This ticket could not be found.",

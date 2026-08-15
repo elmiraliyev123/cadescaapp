@@ -44,6 +44,7 @@ import type {
   StudentProfileStats
 } from "@/lib/server/social";
 import { cn } from "@/lib/utils";
+import { ExploreSearch } from "@/components/search/ExploreSearch";
 
 const EMPTY_FORM_STATE: SocialFormState = { ok: false, message: "" };
 const EMPTY_PROFILE_SETTINGS_STATE: ProfileSettingsFormState = { ok: false, message: "" };
@@ -529,17 +530,17 @@ function PostCard({ post }: { post: SocialPost }) {
   }
 
   return (
-    <article className="overflow-hidden border-b border-outline-variant/30 bg-surface-container-lowest px-1 py-4 first:border-t sm:px-3">
+    <article className="overflow-hidden border-b border-outline-variant/30 bg-surface-container-lowest px-1 py-3.5 first:border-t sm:px-3 sm:py-4">
       <PostAuthorRow
         name={post.authorName}
         username={post.authorUsername}
         avatarUrl={post.authorAvatarUrl}
-        href={post.authorUsername ? `/user/${post.authorUsername}` : undefined}
+        href={post.authorHref || undefined}
         timestamp={formatCompactTime(post.createdAt, language)}
         menu={<PostOverflowMenu post={post} />}
       />
 
-      {post.body ? <p className="mt-3 whitespace-pre-wrap break-words text-[16px] font-normal leading-6 text-primary">{post.body}</p> : null}
+      {post.body ? <p className="mt-2.5 whitespace-pre-wrap break-words text-[16px] font-normal leading-6 text-primary">{post.body}</p> : null}
 
       {post.imageUrl ? (
         <div className="mt-3 overflow-hidden rounded-xl border border-outline-variant/20 bg-surface-container-low">
@@ -724,18 +725,6 @@ const exploreFeatureCards: ReadonlyArray<{
   href?: string;
 }> = [
   {
-    icon: "home_work",
-    titleKey: "social.featureRoommateTitle",
-    descriptionKey: "social.featureRoommateDescription",
-    imageUrl: "https://images.unsplash.com/photo-1522202176988-66273c2fd55f?auto=format&fit=crop&w=1400&q=82"
-  },
-  {
-    icon: "favorite",
-    titleKey: "social.featureMatchTitle",
-    descriptionKey: "social.featureMatchDescription",
-    imageUrl: "https://images.unsplash.com/photo-1529333166437-7750a6dd5a70?auto=format&fit=crop&w=1400&q=82"
-  },
-  {
     icon: "event_available",
     titleKey: "social.featureEventsTitle",
     descriptionKey: "social.featureEventsDescription",
@@ -747,11 +736,34 @@ const exploreFeatureCards: ReadonlyArray<{
     titleKey: "social.featureMarketplaceTitle",
     descriptionKey: "social.featureMarketplaceDescription",
     imageUrl: "https://images.unsplash.com/photo-1523275335684-37898b6baf30?auto=format&fit=crop&w=1400&q=82"
+  },
+  {
+    icon: "favorite",
+    titleKey: "social.featureMatchTitle",
+    descriptionKey: "social.featureMatchDescription",
+    imageUrl: "https://images.unsplash.com/photo-1529333166437-7750a6dd5a70?auto=format&fit=crop&w=1400&q=82"
   }
 ];
 
-export function ExploreScreen({ user, posts }: { user: CurrentStudentContext | null; posts: SocialPost[] }) {
-  const { t } = useLanguage();
+export function ExploreScreen({
+  user,
+  posts,
+  matchMeEligible,
+  matchMeHref
+}: {
+  user: CurrentStudentContext | null;
+  posts: SocialPost[];
+  matchMeEligible: boolean;
+  matchMeHref?: string;
+}) {
+  const { language, t } = useLanguage();
+  const matchUnavailable = {
+    en: "Currently available to verified Bilkent University undergraduate students.",
+    az: "Hazırda təsdiqlənmiş Bilkent Universiteti bakalavr tələbələri üçün əlçatandır.",
+    tr: "Şu anda doğrulanmış Bilkent Üniversitesi lisans öğrencilerine açıktır.",
+    ru: "Сейчас доступно подтверждённым студентам бакалавриата Университета Билькент."
+  }[language];
+  const unavailableLabel = { en: "Unavailable", az: "Əlçatan deyil", tr: "Kullanılamıyor", ru: "Недоступно" }[language];
 
   return (
     <section>
@@ -759,23 +771,34 @@ export function ExploreScreen({ user, posts }: { user: CurrentStudentContext | n
       {isVerifiedStudent(user) ? (
         <div className="mx-auto grid w-full max-w-[984px] gap-6 xl:grid-cols-[minmax(0,680px)_280px]">
           <div className="min-w-0 space-y-5">
-            <div className="no-scrollbar -mx-4 flex snap-x snap-mandatory gap-3 overflow-x-auto px-4 pb-2 pr-8 [scroll-padding-inline:16px] sm:mx-0 sm:px-0 sm:pr-6">
-              {exploreFeatureCards.map((card) => (
+            <ExploreSearch />
+            <section aria-labelledby="explore-discovery-modules">
+              <div className="mb-3 flex items-center justify-between gap-3">
+                <h2 id="explore-discovery-modules" className="text-title-lg font-semibold text-primary">{t("common.explore")}</h2>
+                <span className="material-symbols-outlined icon-inline text-secondary" aria-hidden="true">swipe</span>
+              </div>
+              <div className="no-scrollbar -mx-4 flex snap-x snap-mandatory gap-3 overflow-x-auto px-4 pb-3 pr-[18vw] [scroll-padding-inline:16px] sm:mx-0 sm:px-0 sm:pr-20">
+              {exploreFeatureCards.map((card) => {
+                const isMatchMe = card.titleKey === "social.featureMatchTitle";
+                const href = isMatchMe ? matchMeHref : card.href;
+                return (
                 <div key={card.titleKey} className="snap-start">
                   <FeatureBanner
                     icon={card.icon}
                     title={t(card.titleKey)}
-                    description={t(card.descriptionKey)}
+                    description={isMatchMe && !matchMeEligible ? matchUnavailable : t(card.descriptionKey)}
                     imageUrl={card.imageUrl}
-                    status={card.href ? t("common.explore") : t("social.soon")}
-                    href={card.href}
+                    status={href ? t("common.explore") : isMatchMe ? unavailableLabel : t("social.soon")}
+                    href={href}
                   />
                 </div>
-              ))}
-            </div>
+              );})}
+              </div>
+            </section>
             <div>
               <div className="mb-2">
                 <h2 className="text-title-lg font-semibold text-primary">{t("social.campusPosts")}</h2>
+                <p className="mt-1 text-[13px] leading-5 text-secondary">{t("social.exploreSubtitle")}</p>
               </div>
               <FeedList
                 posts={posts}
@@ -835,7 +858,9 @@ export function ActivityScreen({
   useEffect(() => {
     try {
       const stored = JSON.parse(window.localStorage.getItem(NOTIFICATION_READ_STORAGE_KEY) || "[]") as unknown;
-      setReadItems(new Set(Array.isArray(stored) ? stored.filter((id): id is string => typeof id === "string") : []));
+      const durableRead = items.filter((item) => item.read).map((item) => item.id);
+      const localRead = Array.isArray(stored) ? stored.filter((id): id is string => typeof id === "string") : [];
+      setReadItems(new Set([...durableRead, ...localRead]));
     } catch {
       setReadItems(new Set());
     }
@@ -854,6 +879,25 @@ export function ActivityScreen({
 
   function markAsRead(id: string) {
     setReadItems((current) => new Set(current).add(id));
+    if (id.startsWith("system:")) {
+      void fetch("/api/notifications/read", {
+        method: "PATCH",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ ids: [id.slice("system:".length)] })
+      });
+    }
+  }
+
+  function markAllAsRead() {
+    setReadItems(new Set(items.map((item) => item.id)));
+    const ids = items.filter((item) => item.id.startsWith("system:")).map((item) => item.id.slice("system:".length));
+    if (ids.length) {
+      void fetch("/api/notifications/read", {
+        method: "PATCH",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ ids })
+      });
+    }
   }
 
   return (
@@ -864,7 +908,7 @@ export function ActivityScreen({
           <button
             type="button"
             className="inline-flex h-11 w-11 items-center justify-center gap-2 rounded-full text-caption font-semibold text-secondary transition-colors hover:bg-surface-container-low hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 sm:w-auto sm:rounded-lg sm:px-3"
-            onClick={() => setReadItems(new Set(items.map((item) => item.id)))}
+            onClick={markAllAsRead}
             aria-label={t("social.markAllRead")}
           >
             <span className="material-symbols-outlined icon-ui" aria-hidden="true">done_all</span>
@@ -886,12 +930,12 @@ export function ActivityScreen({
                     key={item.id}
                     actorName={item.actorName}
                     avatarUrl={item.actorAvatarUrl}
-                    sentence={item.type === "like" ? t("social.likedYourPost") : item.type === "follow" ? t("social.followedYou") : t("social.commentedOnPost")}
+                    sentence={item.type === "system" ? item.headline || "Notification" : item.type === "like" ? t("social.likedYourPost") : item.type === "follow" ? t("social.followedYou") : t("social.commentedOnPost")}
                     preview={item.type !== "follow" ? item.commentBody || item.postPreview : null}
                     timestamp={formatCompactTime(item.createdAt, language)}
-                    icon={item.type === "like" ? "favorite" : item.type === "follow" ? "person_add" : "mode_comment"}
+                    icon={item.type === "system" ? "campaign" : item.type === "like" ? "favorite" : item.type === "follow" ? "person_add" : "mode_comment"}
                     unread={unread}
-                    href={item.type === "follow" && item.actorUsername ? `/user/${item.actorUsername}` : item.postId ? `/post/${item.postId}` : undefined}
+                    href={item.href || (item.type === "follow" && item.actorUsername ? `/user/${item.actorUsername}` : item.postId ? `/post/${item.postId}` : undefined)}
                     onClick={() => markAsRead(item.id)}
                   />
                 );
@@ -1298,12 +1342,9 @@ export function ProfileScreen({
             </div>
           </div>
 
-          <nav className="grid grid-cols-2 border-b border-outline-variant/30" aria-label={t("social.profileSections")}>
-            <Link href="#posts" className="inline-flex min-h-12 min-w-0 items-center justify-center border-b-2 border-primary px-2 py-2 text-center text-[13px] font-semibold leading-4 text-primary">
+          <nav className="border-b border-outline-variant/30" aria-label={t("social.profileSections")}>
+            <Link href="#posts" className="inline-flex min-h-12 min-w-0 items-center justify-center border-b-2 border-primary px-3 py-2 text-center text-[13px] font-semibold leading-4 text-primary">
               {t("social.posts")}
-            </Link>
-            <Link href="/app/user/pass" className="inline-flex min-h-12 min-w-0 items-center justify-center border-b-2 border-transparent px-2 py-2 text-center text-[13px] font-semibold leading-4 text-secondary transition-colors hover:border-outline hover:text-primary">
-              {t("social.studentPass")}
             </Link>
           </nav>
 

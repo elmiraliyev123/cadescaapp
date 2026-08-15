@@ -22,6 +22,14 @@ export function getStudentClubUrl() {
   );
 }
 
+export function getBilmatchUrl() {
+  return normalizePublicUrl(process.env.NEXT_PUBLIC_BILMATCH_ORIGIN, "https://bilmatch.com.tr");
+}
+
+export function getEventsUrl() {
+  return normalizePublicUrl(process.env.NEXT_PUBLIC_EVENTS_ORIGIN, "https://events.cadesca.com");
+}
+
 export function getMerchantUrl() {
   return normalizePublicUrl(process.env.NEXT_PUBLIC_MERCHANT_URL, "https://merchant.cadesca.com");
 }
@@ -38,6 +46,8 @@ export const appUrl = getAppUrl();
 export const publicUrl = getPublicUrl();
 export const authUrl = getAuthUrl();
 export const studentClubUrl = getStudentClubUrl();
+export const bilmatchUrl = getBilmatchUrl();
+export const eventsUrl = getEventsUrl();
 export const merchantUrl = getMerchantUrl();
 export const adminUrl = getAdminUrl();
 export const apiUrl = getApiUrl();

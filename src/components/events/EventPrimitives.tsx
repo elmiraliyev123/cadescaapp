@@ -19,7 +19,7 @@ export function EventsFrame({ children, className }: { children: React.ReactNode
   return (
     <section
       className={cn(
-        "mx-auto min-h-[60vh] w-full max-w-[1120px] rounded-[24px] bg-[#fffaf0] p-4 text-black sm:p-6 lg:p-8",
+        "mx-auto w-full max-w-[1120px] rounded-[24px] bg-[#fffaf0] p-4 text-black sm:min-h-[60vh] sm:p-6 lg:p-8",
         className
       )}
     >
@@ -163,8 +163,8 @@ export function EventMetric({ label, value, icon }: { label: string; value: stri
 
 export function EventEmptyState({ text, action }: { text: string; action?: React.ReactNode }) {
   return (
-    <div className="rounded-2xl border-2 border-dashed border-black bg-white px-5 py-12 text-center">
-      <span className="material-symbols-outlined text-[48px] text-black" aria-hidden="true">event_busy</span>
+    <div className="rounded-2xl border-2 border-dashed border-black bg-white px-5 py-8 text-center sm:py-12">
+      <span className="material-symbols-outlined text-[42px] text-black sm:text-[48px]" aria-hidden="true">event_busy</span>
       <p className="mx-auto mt-3 max-w-md text-[15px] font-bold leading-6 text-black">{text}</p>
       {action ? <div className="mt-5 flex justify-center">{action}</div> : null}
     </div>
@@ -205,13 +205,16 @@ export function EventsRouteError({ error, onRetry }: { error?: string | null; on
   );
 }
 
-type ClubNavId = "overview" | "events" | "finance" | "scanner";
+type ClubNavId = "overview" | "posts" | "events" | "members" | "settings" | "finance" | "scanner";
 
-export function ClubEventNav({ current, visible }: { current: ClubNavId; visible?: readonly ClubNavId[] }) {
+export function ClubEventNav({ current, visible, clubId }: { current: ClubNavId; visible?: readonly ClubNavId[]; clubId?: string }) {
   const { copy } = useEventsI18n();
   const items = [
     { id: "overview" as const, href: "/dashboard", label: copy.overview, icon: "dashboard" },
+    { id: "posts" as const, href: "/dashboard/posts", label: "Posts", icon: "post_add" },
     { id: "events" as const, href: "/dashboard/events", label: copy.clubEvents, icon: "event" },
+    { id: "members" as const, href: "/dashboard/members", label: copy.members, icon: "group" },
+    { id: "settings" as const, href: "/dashboard/settings", label: "Settings", icon: "settings" },
     { id: "finance" as const, href: "/dashboard/finance", label: copy.finance, icon: "payments" },
     { id: "scanner" as const, href: "/dashboard/scanner", label: copy.scanner, icon: "qr_code_scanner" }
   ];
@@ -220,7 +223,7 @@ export function ClubEventNav({ current, visible }: { current: ClubNavId; visible
       {items.filter((item) => !visible || visible.includes(item.id)).map((item) => (
         <Link
           key={item.id}
-          href={item.href}
+          href={clubId ? `${item.href}?clubId=${encodeURIComponent(clubId)}` : item.href}
           aria-current={current === item.id ? "page" : undefined}
           className={cn(
             "inline-flex min-h-10 shrink-0 items-center gap-2 rounded-full border border-black px-3.5 text-[13px] font-extrabold",

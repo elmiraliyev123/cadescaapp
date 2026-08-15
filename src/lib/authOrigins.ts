@@ -47,6 +47,11 @@ export function safePostAuthHref(next: string | null | undefined) {
     ) {
       return isLocalBrowser() ? `${parsed.pathname}${parsed.search}` : parsed.toString();
     }
+
+    const authOrigin = new URL(getAuthUrl()).origin;
+    if (parsed.origin === authOrigin && parsed.pathname === "/authorize") {
+      return isLocalBrowser() ? `${parsed.pathname}${parsed.search}` : parsed.toString();
+    }
   } catch {
     return studentAppHomeHref();
   }

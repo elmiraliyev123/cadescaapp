@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 
 import { requireAdminSession } from "@/lib/server/adminAuth";
-import { EventsError, reviewEventAsAdmin, setEventFeaturedAsAdmin } from "@/lib/server/events";
+import { EventsError, reviewEventAsAdmin, setEventFeaturedAsAdmin, setEventModerationAsAdmin } from "@/lib/server/events";
 
 export type AdminEventActionState = {
   ok: boolean;
@@ -67,6 +67,28 @@ export async function featureEventAction(
     revalidatePath("/app/user/home");
     revalidatePath("/app/user/explore");
     return { ok: true, message: "events.admin.feature_saved" };
+  } catch (error) {
+    return { ok: false, message: actionError(error) };
+  }
+}
+
+export async function moderateEventAction(
+  _previousState: AdminEventActionState = EMPTY_STATE,
+  formData: FormData
+): Promise<AdminEventActionState> {
+  try {
+    const admin = await requireAdminSession();
+    const suspended = text(formData, "suspended") === "true";
+    await setEventModerationAsAdmin({
+      eventId: text(formData, "eventId"),
+      suspended,
+      adminEmail: admin.email,
+      reason: text(formData, "reason") || null
+    });
+    revalidatePath("/app/admin/events");
+    revalidatePath("/app/user/events");
+    revalidatePath("/events");
+    return { ok: true, message: "events.admin.review_saved" };
   } catch (error) {
     return { ok: false, message: actionError(error) };
   }

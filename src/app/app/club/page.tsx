@@ -2,22 +2,24 @@ import { redirect } from "next/navigation";
 
 import { ClubDashboardView } from "@/components/events/ClubEventViews";
 import { EventsRouteError } from "@/components/events/EventPrimitives";
+import { hasClubCapability } from "@/lib/clubs/permissions";
 import { canManageClubEvents, canManageClubFinance, canScanClubEvents } from "@/lib/events/permissions";
 import { getCurrentClubDashboard } from "@/lib/server/events";
 
 export const dynamic = "force-dynamic";
 
-export default async function ClubDashboardPage() {
+export default async function ClubDashboardPage({ searchParams }: { searchParams: Promise<{ clubId?: string }> }) {
   let dashboard;
   try {
-    dashboard = await getCurrentClubDashboard();
+    const { clubId } = await searchParams;
+    dashboard = await getCurrentClubDashboard(clubId);
   } catch (error) {
     console.error("[club_dashboard] unavailable", { reason: error instanceof Error ? error.name : "unknown" });
     return <EventsRouteError error={(error as { code?: string })?.code} />;
   }
   if (!dashboard) return <EventsRouteError error="club_not_found" />;
-  if (canManageClubEvents(dashboard.roles)) {
-    const isOwner = dashboard.roles.includes("club_owner");
+  if (hasClubCapability(dashboard.roles, "club.workspace.view")) {
+    const canManageMembers = hasClubCapability(dashboard.roles, "club.members.manage");
     return <ClubDashboardView dashboard={{
       club: {
         id: dashboard.club.id,
@@ -32,7 +34,7 @@ export default async function ClubDashboardPage() {
         updatedAt: dashboard.club.updatedAt
       },
       roles: dashboard.roles,
-      members: isOwner ? dashboard.members : [],
+      members: canManageMembers ? dashboard.members : [],
       events: dashboard.events,
       analytics: {
         ...dashboard.analytics,
