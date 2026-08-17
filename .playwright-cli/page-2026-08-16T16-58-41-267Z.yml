@@ -1,0 +1,76 @@
+- generic [active] [ref=f1e1]:
+  - main [ref=f1e3]:
+    - generic [ref=f1e5]:
+      - img "Cadesca" [ref=f1e7]
+      - generic [ref=f1e8]:
+        - button "TR" [ref=f1e9] [cursor=pointer]
+        - button "AZ" [ref=f1e10] [cursor=pointer]
+        - button "EN" [ref=f1e11] [cursor=pointer]
+        - button "RU" [ref=f1e12] [cursor=pointer]
+    - generic [ref=f1e13]:
+      - complementary [ref=f1e14]:
+        - paragraph [ref=f1e15]: New club application
+        - heading "Apply to join Cadesca" [level=1] [ref=f1e16]
+        - paragraph [ref=f1e17]: Tell us about your student club. Applications are reviewed before publishing and management tools are enabled.
+        - generic [ref=f1e18]:
+          - generic [ref=f1e19]: verified_user
+          - paragraph [ref=f1e21]: Before approval, you can save and manage this application only. Publishing, attendees, team roles and check-in become available after approval.
+      - generic [ref=f1e23]:
+        - navigation "Application progress" [ref=f1e24]:
+          - list [ref=f1e25]:
+            - listitem [ref=f1e26]:
+              - button "1 Club information" [ref=f1e27] [cursor=pointer]:
+                - generic [ref=f1e28]: "1"
+                - text: Club information
+            - listitem [ref=f1e29]:
+              - button "2 Contact" [ref=f1e30] [cursor=pointer]:
+                - generic [ref=f1e31]: "2"
+                - text: Contact
+            - listitem [ref=f1e32]:
+              - button "3 Leadership" [ref=f1e33] [cursor=pointer]:
+                - generic [ref=f1e34]: "3"
+                - text: Leadership
+            - listitem [ref=f1e35]:
+              - button "4 Verification" [ref=f1e36] [cursor=pointer]:
+                - generic [ref=f1e37]: "4"
+                - text: Verification
+            - listitem [ref=f1e38]:
+              - button "5 Review" [ref=f1e39] [cursor=pointer]:
+                - generic [ref=f1e40]: "5"
+                - text: Review
+        - generic [ref=f1e42]:
+          - paragraph [ref=f1e43]: Step 2 of 5
+          - heading "Contact information" [level=2] [ref=f1e44]
+          - generic [ref=f1e45]:
+            - paragraph [ref=f1e46]: Applicant
+            - paragraph [ref=f1e47]: Cadesca Upload QA
+            - paragraph [ref=f1e48]: qa-club-upload-30e6a442f7914d21@example.invalid
+          - generic [ref=f1e49]:
+            - generic [ref=f1e50]:
+              - generic [ref=f1e51]: Official club email
+              - textbox "Official club email" [ref=f1e52]
+            - generic [ref=f1e53]:
+              - generic [ref=f1e54]: Phone (optional)
+              - textbox "Phone (optional)" [ref=f1e55]
+            - generic [ref=f1e56]:
+              - generic [ref=f1e57]: Website
+              - textbox "Website" [ref=f1e58]:
+                - /placeholder: https://
+            - generic [ref=f1e59]:
+              - generic [ref=f1e60]: Instagram
+              - textbox "Instagram" [ref=f1e61]:
+                - /placeholder: https://instagram.com/…
+            - generic [ref=f1e62]:
+              - generic [ref=f1e63]: LinkedIn
+              - textbox "LinkedIn" [ref=f1e64]:
+                - /placeholder: https://linkedin.com/…
+            - generic [ref=f1e65]:
+              - generic [ref=f1e66]: Other social link
+              - textbox "Other social link" [ref=f1e67]:
+                - /placeholder: https://
+        - generic [ref=f1e68]:
+          - generic [ref=f1e69]:
+            - button "Back" [ref=f1e70] [cursor=pointer]
+            - button "Save draft" [ref=f1e71] [cursor=pointer]
+          - button "Continue" [ref=f1e72] [cursor=pointer]
+  - alert [ref=f1e74]

@@ -327,13 +327,10 @@ function isClubWorkspacePath(pathname: string) {
   return pathname === "/app/club" || pathname.startsWith("/app/club/");
 }
 
-function clubWorkspacePath(pathname: string) {
-  if (pathname === "/clubs") return "/app/club/clubs";
-  const selectedClub = pathname.match(/^\/clubs\/([0-9a-f-]{36})$/i);
-  if (selectedClub) return `/app/club?clubId=${encodeURIComponent(selectedClub[1])}`;
-  if (pathname === "/dashboard") return "/app/club";
-  if (pathname.startsWith("/dashboard/")) return `/app/club${pathname.slice("/dashboard".length)}`;
-  return null;
+function studentClubWorkspacePath(pathname: string) {
+  const match = pathname.match(/^\/dashboard\/([a-z0-9](?:[a-z0-9-]{1,90}[a-z0-9])?)(\/.*)?$/i);
+  if (!match) return null;
+  return `/app/club/manage/${match[1]}${match[2] || ""}`;
 }
 
 function hasSupabaseAuthCookie(request: NextRequest) {
@@ -359,12 +356,6 @@ function authLoginRedirect(request: NextRequest) {
   return redirectAbsolute(url.toString());
 }
 
-function studentClubLoginRedirect(request: NextRequest, pathname: "/application" | "/dashboard" | "/waiting-approval") {
-  const url = new URL("/login", authOrigin(request));
-  url.searchParams.set("next", `${studentClubOrigin(request)}${pathname}`);
-  return redirectAbsolute(url.toString());
-}
-
 function safePortalDestination(request: NextRequest) {
   const next = request.nextUrl.searchParams.get("next");
   if (!next) return null;
@@ -374,11 +365,13 @@ function safePortalDestination(request: NextRequest) {
     const portalOrigin = new URL(studentClubOrigin(request)).origin;
     if (
       destination.origin === portalOrigin &&
-      (destination.pathname === "/application" ||
-        destination.pathname === "/dashboard" ||
-        destination.pathname === "/waiting-approval")
+      (destination.pathname === "/resolve" ||
+        destination.pathname === "/application" ||
+        destination.pathname.startsWith("/application/") ||
+        destination.pathname === "/clubs" ||
+        destination.pathname.startsWith("/dashboard/"))
     ) {
-      return destination.toString();
+      return new URL("/resolve", portalOrigin).toString();
     }
   } catch {
     // Fall through to the regular app home.
@@ -472,16 +465,15 @@ export async function middleware(request: NextRequest) {
 
   if (host === "studentclub.cadesca.com") {
     if (pathname === "/") {
-      return finalizeResponse(
-        request,
-        applyLocaleToResponse(redirectTo(request, "/application"), localeResolution)
-      );
+      const rewrite = request.nextUrl.clone();
+      rewrite.pathname = "/student-club";
+      return finalizeResponse(request, applyLocaleToResponse(NextResponse.rewrite(rewrite), localeResolution));
     }
 
     if (pathname === "/student-club" || pathname.startsWith("/student-club/")) {
       return finalizeResponse(
         request,
-        applyLocaleToResponse(redirectTo(request, "/application"), localeResolution)
+        applyLocaleToResponse(redirectTo(request, "/"), localeResolution)
       );
     }
 
@@ -499,51 +491,50 @@ export async function middleware(request: NextRequest) {
       );
     }
 
-    if (pathname === "/application") {
+    if (pathname === "/resolve" || pathname === "/application" || pathname.startsWith("/application/") || pathname === "/clubs") {
+      if (pathname !== "/resolve" && !(await hasStudentSession(request))) {
+        return finalizeResponse(
+          request,
+          applyLocaleToResponse(redirectTo(request, "/"), localeResolution)
+        );
+      }
       const rewrite = request.nextUrl.clone();
-      rewrite.pathname = "/student-club";
+      rewrite.pathname = `/student-club${pathname}`;
       return finalizeResponse(request, applyLocaleToResponse(NextResponse.rewrite(rewrite), localeResolution));
     }
 
     if (pathname === "/waiting-approval") {
-      if (!(await hasStudentSession(request))) {
-        return finalizeResponse(
-          request,
-          applyLocaleToResponse(studentClubLoginRedirect(request, "/waiting-approval"), localeResolution)
-        );
-      }
-      const rewrite = request.nextUrl.clone();
-      rewrite.pathname = "/student-club/status";
-      return finalizeResponse(request, applyLocaleToResponse(NextResponse.rewrite(rewrite), localeResolution));
+      return finalizeResponse(request, applyLocaleToResponse(redirectTo(request, "/resolve"), localeResolution));
     }
 
-    const workspacePath = clubWorkspacePath(pathname);
-    if (workspacePath) {
+    if (pathname === "/dashboard") {
+      return finalizeResponse(request, applyLocaleToResponse(redirectTo(request, "/resolve"), localeResolution));
+    }
+
+    const studentClubWorkspace = studentClubWorkspacePath(pathname);
+    if (studentClubWorkspace) {
       if (!(await hasStudentSession(request))) {
         return finalizeResponse(
           request,
-          applyLocaleToResponse(studentClubLoginRedirect(request, "/dashboard"), localeResolution)
+          applyLocaleToResponse(redirectTo(request, "/"), localeResolution)
         );
       }
       const rewrite = request.nextUrl.clone();
-      const [workspacePathname, workspaceSearch] = workspacePath.split("?");
-      rewrite.pathname = workspacePathname;
-      if (workspaceSearch) rewrite.search = `?${workspaceSearch}`;
+      rewrite.pathname = studentClubWorkspace;
       return finalizeResponse(request, applyLocaleToResponse(NextResponse.rewrite(rewrite), localeResolution));
     }
 
     if (isClubWorkspacePath(pathname)) {
-      const suffix = pathname.slice("/app/club".length);
       return finalizeResponse(
         request,
-        applyLocaleToResponse(redirectTo(request, `/dashboard${suffix}`), localeResolution)
+        applyLocaleToResponse(redirectTo(request, "/resolve"), localeResolution)
       );
     }
 
     if (!isPublicProfilePath(pathname) && !isPublicPostPath(pathname) && !isPublicMediaPath(pathname)) {
       return finalizeResponse(
         request,
-        applyLocaleToResponse(redirectTo(request, "/application"), localeResolution)
+        applyLocaleToResponse(redirectTo(request, "/resolve"), localeResolution)
       );
     }
   } else if (
@@ -643,13 +634,12 @@ export async function middleware(request: NextRequest) {
     }
 
     if (isClubWorkspacePath(pathname)) {
-      const suffix = pathname.slice("/app/club".length);
-      const target = new URL(`/dashboard${suffix}${request.nextUrl.search}`, studentClubOrigin(request));
+      const target = new URL("/resolve", studentClubOrigin(request));
       return finalizeResponse(request, applyLocaleToResponse(redirectAbsolute(target.toString()), localeResolution));
     }
 
     if (pathname === "/app/user/club" || pathname.startsWith("/app/user/club/")) {
-      const target = new URL("/application", studentClubOrigin(request));
+      const target = new URL("/resolve", studentClubOrigin(request));
       return finalizeResponse(request, applyLocaleToResponse(redirectAbsolute(target.toString()), localeResolution));
     }
 

@@ -24,12 +24,17 @@ export default async function ClubDashboardPage({ searchParams }: { searchParams
       club: {
         id: dashboard.club.id,
         name: dashboard.club.name,
+        universityName: dashboard.club.universityName,
+        acronym: dashboard.club.acronym,
+        category: dashboard.club.category,
         status: dashboard.club.status,
         description: dashboard.club.description,
         logoUrl: dashboard.club.logoUrl,
+        coverImageUrl: dashboard.club.coverImageUrl,
         contactEmail: dashboard.club.contactEmail,
         websiteUrl: dashboard.club.websiteUrl,
         instagramUrl: dashboard.club.instagramUrl,
+        linkedinUrl: dashboard.club.linkedinUrl,
         universityPageUrl: dashboard.club.universityPageUrl,
         updatedAt: dashboard.club.updatedAt
       },

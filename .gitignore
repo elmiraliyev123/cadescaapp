@@ -23,3 +23,6 @@ login_out*.html
 
 # TypeScript
 *.tsbuildinfo
+.vercel
+.aidesigner/*
+!.aidesigner/.gitkeep

@@ -96,7 +96,7 @@ function AdmissionCard({
   );
 }
 
-export function EventScannerClient({ event }: { event: ScannerAssignedEvent }) {
+export function EventScannerClient({ event, hideNavigation = false, backHref = "/dashboard/scanner" }: { event: ScannerAssignedEvent; hideNavigation?: boolean; backHref?: string }) {
   const { copy, errorLabel, formatDateTime } = useEventsI18n();
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
@@ -278,12 +278,12 @@ export function EventScannerClient({ event }: { event: ScannerAssignedEvent }) {
 
   return (
     <EventsFrame>
-      <ClubEventNav current="scanner" visible={["scanner"]} />
+      {!hideNavigation ? <ClubEventNav current="scanner" visible={["scanner"]} /> : null}
       <EventsHeader
         eyebrow={event.clubName}
         title={event.title}
         description={`${formatDateTime(event.startAt)} · ${event.location}`}
-        action={<Link href="/dashboard/scanner" className={eventSecondaryButton}><span>{copy.scannerEvents}</span></Link>}
+        action={<Link href={backHref} className={eventSecondaryButton}><span>{copy.scannerEvents}</span></Link>}
       />
 
       <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_360px]">

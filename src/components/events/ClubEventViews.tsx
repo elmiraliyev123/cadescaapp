@@ -14,6 +14,7 @@ import {
   inviteClubMemberAction,
   revokeClubMembershipAction,
   revokeScannerFromEventAction,
+  setEventRegistrationAction,
   submitEventForReviewAction,
   updateEventCapacityAction,
   updateEventDraftAction,
@@ -58,12 +59,17 @@ type ClubDashboardPresentation = Pick<ClubDashboard, "roles" | "members" | "even
     ClubDashboard["club"],
     | "id"
     | "name"
+    | "universityName"
+    | "acronym"
+    | "category"
     | "status"
     | "description"
     | "logoUrl"
+    | "coverImageUrl"
     | "contactEmail"
     | "websiteUrl"
     | "instagramUrl"
+    | "linkedinUrl"
     | "universityPageUrl"
     | "updatedAt"
   >;
@@ -237,16 +243,17 @@ export function ClubDashboardView({ dashboard }: { dashboard: ClubDashboardPrese
   );
 }
 
-export function ClubMembersView({ dashboard }: { dashboard: ClubDashboardPresentation }) {
+export function ClubMembersView({ dashboard, hideNavigation = false }: { dashboard: ClubDashboardPresentation; hideNavigation?: boolean }) {
   const { copy, language, statusLabel } = useEventsI18n();
   const management = clubManagementCopy[language];
+  const canManageMembers = hasClubCapability(dashboard.roles, "club.members.manage");
   return (
     <EventsFrame>
-      <ClubEventNav current="members" visible={visibleClubNavigation(dashboard.roles)} clubId={dashboard.club.id} />
+      {!hideNavigation ? <ClubEventNav current="members" visible={visibleClubNavigation(dashboard.roles)} clubId={dashboard.club.id} /> : null}
       <EventsHeader eyebrow={dashboard.club.name} title={copy.members} description="Invite managers and assign only the capabilities they need." />
       <section>
         <h2 className="mb-4 text-[22px] font-black">{copy.members}</h2>
-        <ClubMutationForm
+        {canManageMembers ? <ClubMutationForm
           action={inviteClubMemberAction}
           className="mb-4 grid gap-3 rounded-2xl border-2 border-black bg-[#fffaf0] p-4 sm:grid-cols-[minmax(0,1fr)_minmax(190px,0.45fr)_auto] sm:items-end"
           buttonClassName={eventPrimaryButton}
@@ -262,13 +269,14 @@ export function ClubMembersView({ dashboard }: { dashboard: ClubDashboardPresent
               <option value="club_admin">{statusLabel("club_admin")}</option>
               <option value="event_manager">{statusLabel("event_manager")}</option>
               <option value="content_manager">{statusLabel("content_manager")}</option>
+              <option value="viewer">Viewer</option>
               <option value="club_member">{statusLabel("club_member")}</option>
               <option value="event_organizer">{statusLabel("event_organizer")}</option>
               <option value="finance_manager">{statusLabel("finance_manager")}</option>
               <option value="door_scanner">{statusLabel("door_scanner")}</option>
             </select>
           </Field>
-        </ClubMutationForm>
+        </ClubMutationForm> : <p className="mb-4 rounded-xl bg-[#F7F5EF] p-4 text-sm text-black/55">You have read-only access to the club team.</p>}
         <div className="overflow-x-auto rounded-2xl border-2 border-black bg-white">
           <table className="w-full min-w-[620px] text-left text-[13px]">
             <thead className="bg-black text-white"><tr><th className="px-4 py-3">{copy.student}</th><th className="px-4 py-3">{copy.role}</th><th className="px-4 py-3">{copy.statusText}</th><th className="px-4 py-3">{copy.actions}</th></tr></thead>
@@ -278,7 +286,7 @@ export function ClubMembersView({ dashboard }: { dashboard: ClubDashboardPresent
                   <td className="px-4 py-3 font-bold">{member.displayName}{member.username ? <span className="ml-2 font-normal text-black/50">@{member.username}</span> : null}</td>
                   <td className="px-4 py-3">{statusLabel(member.role)}</td>
                   <td className="px-4 py-3"><EventStatusPill status={member.status} /></td>
-                  <td className="px-4 py-3">{member.role !== "club_owner" && (member.status === "active" || member.status === "invited" || member.status === "suspended") ? (
+                  <td className="px-4 py-3">{canManageMembers && member.role !== "club_owner" && (member.status === "active" || member.status === "invited" || member.status === "suspended") ? (
                     <ClubMutationForm
                       action={revokeClubMembershipAction}
                       className="space-y-2"
@@ -301,12 +309,13 @@ export function ClubMembersView({ dashboard }: { dashboard: ClubDashboardPresent
   );
 }
 
-export function ClubSettingsView({ dashboard }: { dashboard: ClubDashboardPresentation }) {
+export function ClubSettingsView({ dashboard, hideNavigation = false }: { dashboard: ClubDashboardPresentation; hideNavigation?: boolean }) {
+  const canUpdate = hasClubCapability(dashboard.roles, "club.profile.update");
   return (
     <EventsFrame>
-      <ClubEventNav current="settings" visible={visibleClubNavigation(dashboard.roles)} clubId={dashboard.club.id} />
+      {!hideNavigation ? <ClubEventNav current="settings" visible={visibleClubNavigation(dashboard.roles)} clubId={dashboard.club.id} /> : null}
       <EventsHeader eyebrow={dashboard.club.name} title="Settings" description="Manage the public club identity shown across Cadesca." />
-      <ApprovedClubProfileForm club={dashboard.club} />
+      {canUpdate ? <ApprovedClubProfileForm club={dashboard.club} /> : <section className="rounded-2xl border border-black/10 bg-white p-6"><h2 className="text-xl font-semibold">Public club profile</h2><p className="mt-2 text-sm leading-6 text-black/55">You have read-only access. An owner or administrator can update the public club profile.</p></section>}
     </EventsFrame>
   );
 }
@@ -409,10 +418,14 @@ function OrganizerTicketActions({ attendee }: { attendee: ClubEventAttendee }) {
 
 export function ClubEventForm({
   workspace,
-  event
+  event,
+  basePath = "/dashboard",
+  hideNavigation = false
 }: {
   workspace: ClubWorkspacePresentation;
   event?: ClubEventSummary;
+  basePath?: string;
+  hideNavigation?: boolean;
 }) {
   const { copy, errorLabel, statusLabel } = useEventsI18n();
   const isEdit = Boolean(event);
@@ -423,29 +436,44 @@ export function ClubEventForm({
   const [startLocal, setStartLocal] = useState(() => toLocalInput(event?.startAt, 72));
   const [endLocal, setEndLocal] = useState(() => toLocalInput(event?.endAt, 75));
   const [deadlineLocal, setDeadlineLocal] = useState(() => toLocalInput(event?.ticketRequestDeadline, 48));
+  const [registrationStartLocal, setRegistrationStartLocal] = useState(() => event?.registrationStartsAt ? toLocalInput(event.registrationStartsAt, 24) : "");
   const visibleNavigation = visibleClubNavigation(workspace.roles);
 
   return (
     <EventsFrame>
-      <ClubEventNav current="events" visible={visibleNavigation} clubId={workspace.clubId} />
+      {!hideNavigation ? <ClubEventNav current="events" visible={visibleNavigation} clubId={workspace.clubId} /> : null}
       <EventsHeader eyebrow={workspace.clubName} title={isEdit ? copy.editEvent : copy.createEvent} description={copy.eventFormDescription} />
       <form action={formAction} className="rounded-2xl border-2 border-black bg-white p-4 shadow-[5px_5px_0_#ffd400] sm:p-6">
         <input type="hidden" name="clubId" value={workspace.clubId} />
         <input type="hidden" name="startAt" value={localInputToIso(startLocal)} />
         <input type="hidden" name="endAt" value={localInputToIso(endLocal)} />
         <input type="hidden" name="ticketRequestDeadline" value={localInputToIso(deadlineLocal)} />
+        <input type="hidden" name="registrationStartsAt" value={registrationStartLocal ? localInputToIso(registrationStartLocal) : ""} />
         {event ? <input type="hidden" name="eventId" value={event.id} /> : null}
         <div className="grid gap-5 md:grid-cols-2">
+          <div className="border-b border-black/15 pb-3 md:col-span-2"><p className="text-xs font-black uppercase tracking-[0.12em] text-black/45">Basic information</p><h2 className="mt-1 text-xl font-black">What students will see</h2></div>
           <Field label={copy.title} className="md:col-span-2"><input name="title" required minLength={3} maxLength={140} defaultValue={event?.title} className={eventInput} /></Field>
+          <Field label="Short description" className="md:col-span-2"><textarea name="shortDescription" minLength={3} maxLength={240} rows={3} defaultValue={event?.shortDescription || ""} className={eventInput} placeholder="A concise summary for discovery cards" /></Field>
           <Field label={copy.description} className="md:col-span-2"><textarea name="description" required minLength={20} maxLength={10000} rows={7} defaultValue={event?.description} className={eventInput} /></Field>
+          <div className="mt-2 border-b border-black/15 pb-3 md:col-span-2"><p className="text-xs font-black uppercase tracking-[0.12em] text-black/45">Date &amp; location</p><h2 className="mt-1 text-xl font-black">When and where it happens</h2></div>
           <Field label={copy.location}><input name="location" required maxLength={240} defaultValue={event?.location} className={eventInput} /></Field>
           <Field label={copy.venueDetails}><input name="venueDetails" maxLength={500} defaultValue={event?.venueDetails || ""} className={eventInput} /></Field>
+          <Field label="Venue name"><input name="venueName" maxLength={240} defaultValue={event?.venueName || event?.location || ""} className={eventInput} /></Field>
+          <Field label="Venue address"><input name="venueAddress" maxLength={500} defaultValue={event?.venueAddress || ""} className={eventInput} /></Field>
           <Field label={copy.start}><input type="datetime-local" required value={startLocal} onChange={(e) => setStartLocal(e.target.value)} className={eventInput} /></Field>
           <Field label={copy.end}><input type="datetime-local" required value={endLocal} onChange={(e) => setEndLocal(e.target.value)} className={eventInput} /></Field>
           <Field label={copy.requestDeadline}><input type="datetime-local" required value={deadlineLocal} onChange={(e) => setDeadlineLocal(e.target.value)} className={eventInput} /></Field>
+          <Field label="Registration opens"><input type="datetime-local" value={registrationStartLocal} onChange={(e) => setRegistrationStartLocal(e.target.value)} className={eventInput} /></Field>
           <Field label={copy.timezone}><input name="timezone" required defaultValue={event?.timezone || "Europe/Istanbul"} className={eventInput} /></Field>
+          <div className="mt-2 border-b border-black/15 pb-3 md:col-span-2"><p className="text-xs font-black uppercase tracking-[0.12em] text-black/45">Registration</p><h2 className="mt-1 text-xl font-black">Capacity and eligibility</h2></div>
           <Field label={copy.capacity}><input type="number" name="capacity" required min={1} max={100000} defaultValue={event?.capacity || 100} className={eventInput} /></Field>
           <Field label={copy.ageRequirement}><input type="number" name="ageRequirement" min={0} max={99} defaultValue={event?.ageRequirement ?? ""} className={eventInput} /></Field>
+          <div className="mt-2 border-b border-black/15 pb-3 md:col-span-2"><p className="text-xs font-black uppercase tracking-[0.12em] text-black/45">Publishing</p><h2 className="mt-1 text-xl font-black">Discovery and organizer details</h2></div>
+          <Field label="Visibility"><select name="visibility" defaultValue={event?.visibility || "university"} className={eventInput}><option value="public">Public</option><option value="university">University only</option><option value="private">Private / invite only</option></select></Field>
+          <Field label="Tags"><input name="tags" maxLength={480} defaultValue={(event?.tags || []).join(", ")} className={eventInput} placeholder="career, networking, workshop" /></Field>
+          <Field label="Organizer contact"><input name="organizerContact" maxLength={254} defaultValue={event?.organizerContact || ""} className={eventInput} /></Field>
+          <Field label="External link"><input type="url" inputMode="url" name="externalLink" maxLength={2048} defaultValue={event?.externalLink || ""} className={eventInput} placeholder="https://" /></Field>
+          <div className="mt-2 border-b border-black/15 pb-3 md:col-span-2"><p className="text-xs font-black uppercase tracking-[0.12em] text-black/45">Tickets</p><h2 className="mt-1 text-xl font-black">Payment and approval</h2></div>
           <label className="flex min-h-12 items-center gap-3 rounded-xl border border-black bg-[#fffaf0] px-4 py-3 text-[14px] font-bold md:col-span-2">
             <input type="checkbox" name="isFree" value="true" checked={isFree} onChange={(e) => setIsFree(e.target.checked)} className="h-4 w-4 accent-black" />{copy.isFree}
           </label>
@@ -467,23 +495,26 @@ export function ClubEventForm({
           )}
           <Field label={copy.paymentNotes} className="md:col-span-2"><textarea name="paymentInstructions" rows={3} defaultValue={event?.paymentInstructions || ""} className={eventInput} /></Field>
           <Field label={copy.refundPolicy} className="md:col-span-2"><textarea name="refundPolicy" required minLength={5} maxLength={2000} rows={4} defaultValue={event?.refundPolicy} className={eventInput} /></Field>
+          <div className="mt-2 border-b border-black/15 pb-3 md:col-span-2"><p className="text-xs font-black uppercase tracking-[0.12em] text-black/45">Media</p><h2 className="mt-1 text-xl font-black">Event cover</h2></div>
           <Field label={copy.coverImage} className="md:col-span-2"><input type="file" name="cover" required={!isEdit || !event?.coverImageUrl} accept="image/jpeg,image/png,image/webp,image/avif" className={cn(eventInput, "file:mr-3 file:rounded-lg file:border-0 file:bg-black file:px-3 file:py-1.5 file:font-bold file:text-white")} /></Field>
         </div>
         {state.message ? <p className={cn("mt-5 rounded-xl px-3 py-2 text-[13px] font-bold", state.ok ? "border border-black bg-[#ffd400] text-black" : "bg-black text-white")} role={state.ok ? "status" : "alert"}>{state.ok ? copy.draftSaved : errorLabel(state.message)}</p> : null}
         <div className="mt-6 flex flex-wrap gap-3">
           <button type="submit" disabled={pending} className={eventPrimaryButton}><span>{pending ? copy.loading : copy.saveDraft}</span></button>
-          {state.ok && state.eventId ? <Link href={`/dashboard/events/${state.eventId}`} className={eventSecondaryButton}><span>{copy.viewEvent}</span></Link> : null}
-          <Link href={`/dashboard/events?clubId=${encodeURIComponent(workspace.clubId)}`} className={eventSecondaryButton}><span>{copy.clubEvents}</span></Link>
+          {state.ok && state.eventId ? <Link href={`${basePath}/events/${state.eventId}`} className={eventSecondaryButton}><span>{copy.viewEvent}</span></Link> : null}
+          <Link href={`${basePath}/events`} className={eventSecondaryButton}><span>{copy.clubEvents}</span></Link>
         </div>
       </form>
     </EventsFrame>
   );
 }
 
-export function ClubEventManageView({ workspace, event, operations }: { workspace: ClubWorkspacePresentation; event: ClubEventSummary; operations: ClubEventOperations }) {
+export function ClubEventManageView({ workspace, event, operations, basePath = "/dashboard", hideNavigation = false }: { workspace: ClubWorkspacePresentation; event: ClubEventSummary; operations: ClubEventOperations; basePath?: string; hideNavigation?: boolean }) {
   const { copy, language, formatDateTime, formatCurrency } = useEventsI18n();
   const management = clubManagementCopy[language];
   const canManage = canManageClubEvents(workspace.roles);
+  const canCheckIn = hasClubCapability(workspace.roles, "club.events.check_in");
+  const registrationOpen = new Date(event.ticketRequestDeadline).getTime() > Date.now();
   const canSubmit = canManage && event.status === "draft";
   const canEdit = canManage && (event.status === "draft" || event.status === "rejected");
   const canCancel = canManage && (["draft", "pending_review", "published", "sold_out", "rejected"] as const).includes(
@@ -491,20 +522,21 @@ export function ClubEventManageView({ workspace, event, operations }: { workspac
   );
   return (
     <EventsFrame>
-      <ClubEventNav current="events" visible={visibleClubNavigation(workspace.roles)} clubId={workspace.clubId} />
+      {!hideNavigation ? <ClubEventNav current="events" visible={visibleClubNavigation(workspace.roles)} clubId={workspace.clubId} /> : null}
       <EventsHeader
         eyebrow={workspace.clubName}
         title={event.title}
         description={`${formatDateTime(event.startAt)} · ${event.location}`}
-        action={<>{canEdit ? <Link href={`/dashboard/events/${event.id}/edit`} className={eventSecondaryButton}><span>{copy.edit}</span></Link> : null}{event.status === "published" || event.status === "sold_out" ? <Link href={`/event/${event.slug}`} className={eventPrimaryButton}><span>{copy.viewEvent}</span></Link> : null}</>}
+        action={<>{canEdit ? <Link href={`${basePath}/events/${event.id}/edit`} className={eventSecondaryButton}><span>{copy.edit}</span></Link> : null}{event.status === "published" || event.status === "sold_out" ? <a href={`https://events.cadesca.com/event/${event.slug}`} className={eventPrimaryButton}><span>{copy.viewEvent}</span></a> : null}</>}
       />
       <div className="mb-6 flex flex-wrap gap-2"><EventStatusPill status={event.status} /><EventStatusPill status={event.featuredStatus} /></div>
-      <div className="grid gap-4 sm:grid-cols-3">
+      <nav aria-label="Event management sections" className="mb-6 overflow-x-auto"><div className="flex min-w-max gap-2"><a href="#overview" className="inline-flex min-h-10 items-center rounded-full bg-black px-3.5 text-xs font-bold text-white">Overview</a><a href="#attendees" className="inline-flex min-h-10 items-center rounded-full border border-black/15 bg-white px-3.5 text-xs font-bold">Attendees</a><a href="#check-in" className="inline-flex min-h-10 items-center rounded-full border border-black/15 bg-white px-3.5 text-xs font-bold">Check-in</a><a href="#content" className="inline-flex min-h-10 items-center rounded-full border border-black/15 bg-white px-3.5 text-xs font-bold">Content</a><a href="#settings" className="inline-flex min-h-10 items-center rounded-full border border-black/15 bg-white px-3.5 text-xs font-bold">Settings</a></div></nav>
+      <div id="overview" className="scroll-mt-28 grid gap-4 sm:grid-cols-3">
         <EventMetric label={copy.requests} value={event.requestCount} icon="confirmation_number" />
         <EventMetric label={copy.approvedTickets} value={event.approvedCount} icon="verified" />
         <EventMetric label={copy.checkedIn} value={event.checkedInCount} icon="how_to_reg" />
       </div>
-      <div className="mt-6 rounded-2xl border-2 border-black bg-white p-5">
+      <div id="content" className="mt-6 scroll-mt-28 rounded-2xl border-2 border-black bg-white p-5">
         <p className="whitespace-pre-wrap text-[14px] leading-6 text-black/70">{event.description}</p>
         <div className="mt-5 grid gap-3 border-t border-black/10 pt-5 sm:grid-cols-2">
           <p><strong>{copy.capacity}:</strong> {event.capacity}</p>
@@ -513,10 +545,11 @@ export function ClubEventManageView({ workspace, event, operations }: { workspac
           <p><strong>{copy.location}:</strong> {event.location}</p>
         </div>
       </div>
+      <span id="settings" className="block scroll-mt-28" aria-hidden="true" />
       {canManage && event.moderationStatus !== "platform_suspended" ? (
         <ClubMutationForm
           action={updateEventCapacityAction}
-          className="mt-5 space-y-3 rounded-2xl border-2 border-black bg-[#fffaf0] p-4"
+          className="mt-5 scroll-mt-28 space-y-3 rounded-2xl border-2 border-black bg-[#fffaf0] p-4"
           buttonClassName={eventPrimaryButton}
           submitLabel="Update capacity"
           pendingLabel={management.saving}
@@ -528,6 +561,21 @@ export function ClubEventManageView({ workspace, event, operations }: { workspac
             <input type="number" name="capacity" min={1} max={100000} required defaultValue={event.capacity} className={eventInput} />
           </label>
           <p className="text-[12px] leading-5 text-black/60">Capacity cannot be reduced below confirmed or held reservations.</p>
+        </ClubMutationForm>
+      ) : null}
+      {canManage && event.moderationStatus !== "platform_suspended" && (["published", "sold_out"] as const).includes(event.status as "published" | "sold_out") ? (
+        <ClubMutationForm
+          action={setEventRegistrationAction}
+          className="mt-4 space-y-3 rounded-2xl border-2 border-black bg-white p-4"
+          buttonClassName={registrationOpen ? eventSecondaryButton : eventPrimaryButton}
+          submitLabel={registrationOpen ? "Close registration" : "Reopen registration"}
+          pendingLabel={management.saving}
+          successLabel={registrationOpen ? "Registration closed" : "Registration reopened"}
+          confirmMessage={registrationOpen ? "Close registration for new attendees? Existing reservations will remain valid." : undefined}
+        >
+          <input type="hidden" name="eventId" value={event.id} />
+          <input type="hidden" name="registrationAction" value={registrationOpen ? "close" : "open"} />
+          <p className="text-[12px] leading-5 text-black/60">Registration is currently <strong>{registrationOpen ? "open" : "closed"}</strong>.</p>
         </ClubMutationForm>
       ) : null}
       {canManage && event.moderationStatus !== "platform_suspended" ? (
@@ -558,7 +606,7 @@ export function ClubEventManageView({ workspace, event, operations }: { workspac
           ))}</div> : null}
         </section>
       ) : null}
-      <section className="mt-8">
+      <section id="attendees" className="mt-8 scroll-mt-28">
         <h2 className="mb-4 text-[22px] font-black">{management.attendees}</h2>
         {operations.attendees.length ? <div className="overflow-x-auto rounded-2xl border-2 border-black bg-white">
           <table className="w-full min-w-[980px] text-left text-[13px]">
@@ -574,8 +622,9 @@ export function ClubEventManageView({ workspace, event, operations }: { workspac
           </table>
         </div> : <EventEmptyState text={management.noAttendees} />}
       </section>
-      <section className="mt-8">
+      <section id="check-in" className="mt-8 scroll-mt-28">
         <h2 className="mb-4 text-[22px] font-black">{management.scannerAssignments}</h2>
+        {canCheckIn ? <Link href={`${basePath}/events/${event.id}/check-in`} className={cn(eventPrimaryButton, "mb-4")}><span className="material-symbols-outlined" aria-hidden="true">qr_code_scanner</span><span>Open check-in scanner</span></Link> : null}
         {operations.scanners.length ? <div className="grid gap-3 md:grid-cols-2">{operations.scanners.map((scanner) => (
           <article key={scanner.membershipId} className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border-2 border-black bg-white p-4">
             <div><p className="font-black">{scanner.displayName}</p>{scanner.username ? <p className="text-[12px] text-black/55">@{scanner.username}</p> : null}</div>

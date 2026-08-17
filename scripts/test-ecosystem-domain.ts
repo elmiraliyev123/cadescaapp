@@ -28,7 +28,13 @@ assert.equal(evaluateClientAccess({ ...eligibleUser, email: "student@bilkent.edu
 
 assert.equal(hasClubCapability(["content_manager"], "club.posts.create"), true);
 assert.equal(hasClubCapability(["content_manager"], "club.events.publish"), false);
+assert.equal(hasClubCapability(["content_manager"], "club.profile.update"), false);
 assert.equal(hasClubCapability(["event_manager"], "club.events.publish"), true);
+assert.equal(hasClubCapability(["event_manager"], "club.members.manage"), false);
+assert.equal(hasClubCapability(["club_admin"], "club.profile.update"), true);
+assert.equal(hasClubCapability(["club_admin"], "club.roles.manage"), true);
+assert.equal(hasClubCapability(["viewer"], "club.members.view"), true);
+assert.equal(hasClubCapability(["viewer"], "club.members.manage"), false);
 assert.equal(hasClubCapability(["club_member"], "club.settings.manage"), false);
 
 const callback = "https://bilmatch.com.tr/auth/cadesca/callback";

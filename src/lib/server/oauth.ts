@@ -36,6 +36,7 @@ type AuthorizationCodeRow = {
   user_id: string;
   redirect_uri: string;
   scope: string[];
+  nonce: string | null;
   code_challenge: string;
   code_challenge_method: string;
   expires_at: Date | string;
@@ -166,6 +167,7 @@ export async function exchangeAuthorizationCode(input: {
   code: string;
   redirectUri: string;
   codeVerifier: string;
+  expectedNonce?: string;
 }) {
   if (input.grantType !== "authorization_code") throw new OAuthError("unsupported_grant_type", 400);
   if (!input.clientId || !input.code || !input.redirectUri || !isValidPkceValue(input.codeVerifier)) {
@@ -180,7 +182,7 @@ export async function exchangeAuthorizationCode(input: {
   try {
     await database.query("begin");
     const result = await database.query<AuthorizationCodeRow>(
-      `select id, client_id, user_id, redirect_uri, scope, code_challenge,
+      `select id, client_id, user_id, redirect_uri, scope, nonce, code_challenge,
               code_challenge_method, expires_at, used_at
          from public.oauth_authorization_codes
         where code_hash = $1
@@ -193,6 +195,7 @@ export async function exchangeAuthorizationCode(input: {
       authorization.used_at ||
       authorization.client_id !== client.client_id ||
       authorization.redirect_uri !== input.redirectUri ||
+      (input.expectedNonce !== undefined && !safeEqual(input.expectedNonce, authorization.nonce || "")) ||
       authorization.code_challenge_method !== "S256" ||
       new Date(authorization.expires_at).getTime() <= Date.now() ||
       !safeEqual(derivePkceChallenge(input.codeVerifier), authorization.code_challenge)

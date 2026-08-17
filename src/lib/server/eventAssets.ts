@@ -70,6 +70,33 @@ export async function getPublicClubLogoPath(clubId: string) {
   return safePath(row?.logo_url) ? { path: row.logo_url, isPublic: row.is_public } : null;
 }
 
+export async function getPublicClubCoverPath(clubId: string) {
+  const pool = await getReadyPool();
+  const [viewer, admin] = await Promise.all([
+    getCurrentStudentContext().catch(() => null),
+    getAdminSessionFromCookies().catch(() => null)
+  ]);
+  const result = await pool.query<{ cover_image_url: string | null; is_public: boolean }>(
+    `select cover_image_url, (status = 'approved') as is_public
+       from public.student_clubs
+      where id = $1::uuid
+        and (
+          status = 'approved'
+          or $3::boolean
+          or exists (
+            select 1 from public.club_memberships membership
+             where membership.club_id = student_clubs.id
+               and membership.user_id = $2::text
+               and membership.status in ('active', 'invited')
+          )
+        )
+      limit 1`,
+    [clubId, viewer?.id || null, Boolean(admin)]
+  );
+  const row = result.rows[0];
+  return safePath(row?.cover_image_url) ? { path: row.cover_image_url, isPublic: row.is_public } : null;
+}
+
 export async function downloadEventAsset(path: string) {
   if (!safePath(path)) return null;
   const { data, error } = await getSupabaseAdminClient().storage.from(EVENT_ASSET_BUCKET).download(path);

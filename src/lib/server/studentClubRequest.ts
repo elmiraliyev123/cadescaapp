@@ -1,6 +1,9 @@
 import "server-only";
 
-export const MAX_STUDENT_CLUB_FORM_BYTES = 14 * 1024 * 1024;
+// Vercel Functions reject request bodies above 4.5 MB. The main application
+// uses direct-to-storage signed uploads; this limit covers the small legacy
+// multipart/update path with one 4 MB image plus form boundaries.
+export const MAX_STUDENT_CLUB_FORM_BYTES = 4_400 * 1024;
 export const MAX_STUDENT_CLUB_JSON_BYTES = 16 * 1024;
 
 export class StudentClubBodyTooLargeError extends Error {}

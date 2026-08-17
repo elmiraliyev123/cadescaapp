@@ -6,11 +6,17 @@ import { createOAuthClientState, oauthPkceChallenge } from "@/lib/server/oauthCl
 export const runtime = "nodejs";
 
 const CLIENT_STATE_COOKIE = "cadesca_studentclub_oauth_state";
-const SAFE_DESTINATIONS = new Set(["/application", "/dashboard", "/waiting-approval", "/clubs"]);
+
+function safeReturnTo(value: string | null) {
+  const candidate = value || "/resolve";
+  if (["/", "/resolve", "/application", "/clubs"].includes(candidate)) return candidate;
+  if (/^\/application\/[0-9a-f-]{36}(?:\/status)?$/i.test(candidate)) return candidate;
+  if (/^\/dashboard\/[a-z0-9](?:[a-z0-9-]{1,90}[a-z0-9])?(?:\/[a-z0-9/_-]+)?$/i.test(candidate)) return candidate;
+  return "/resolve";
+}
 
 export async function GET(request: Request) {
-  const requestedReturn = new URL(request.url).searchParams.get("return_to") || "/application";
-  const returnTo = SAFE_DESTINATIONS.has(requestedReturn) ? requestedReturn : "/application";
+  const returnTo = safeReturnTo(new URL(request.url).searchParams.get("return_to"));
   const { state, token } = createOAuthClientState(returnTo);
   const callback = `${getStudentClubUrl()}/auth/callback`;
   const authorize = new URL("/authorize", getAuthUrl());
@@ -33,4 +39,3 @@ export async function GET(request: Request) {
   });
   return response;
 }
-

@@ -42,7 +42,12 @@ export function safePostAuthHref(next: string | null | undefined) {
 
     const studentClubOrigin = new URL(getStudentClubUrl()).origin;
     if (
-      ["/application", "/dashboard", "/waiting-approval"].includes(parsed.pathname) &&
+      (parsed.pathname === "/" ||
+        parsed.pathname === "/resolve" ||
+        parsed.pathname === "/application" ||
+        parsed.pathname === "/clubs" ||
+        /^\/application\/[0-9a-f-]{36}(?:\/status)?$/i.test(parsed.pathname) ||
+        /^\/dashboard\/[a-z0-9-]+(?:\/.*)?$/i.test(parsed.pathname)) &&
       (parsed.origin === studentClubOrigin || (isLocalBrowser() && parsed.origin === localOrigin))
     ) {
       return isLocalBrowser() ? `${parsed.pathname}${parsed.search}` : parsed.toString();

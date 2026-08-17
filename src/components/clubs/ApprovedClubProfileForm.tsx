@@ -8,6 +8,7 @@ import {
   type ClubProfileActionMessage,
   type ClubProfileActionState
 } from "@/app/app/club/actions";
+import { CLUB_IMAGE_ACCEPT } from "@/lib/clubs/uploadValidation";
 import { eventInput, eventPrimaryButton } from "@/components/events/EventPrimitives";
 import type { ClubDashboard } from "@/lib/events/types";
 import { useLanguage, type Language } from "@/lib/i18n";
@@ -16,11 +17,16 @@ type EditableClubProfile = Pick<
   ClubDashboard["club"],
   | "id"
   | "name"
+  | "universityName"
+  | "acronym"
+  | "category"
   | "description"
   | "logoUrl"
+  | "coverImageUrl"
   | "contactEmail"
   | "websiteUrl"
   | "instagramUrl"
+  | "linkedinUrl"
   | "universityPageUrl"
   | "updatedAt"
 >;
@@ -54,7 +60,7 @@ const PROFILE_COPY: Record<Language, ProfileCopy> = {
     instagram: "Instagram",
     universityPage: "Official university page",
     logo: "Replace club logo",
-    logoHelp: "Optional JPG, PNG, or WebP, up to 4 MB. Every new logo is safety-checked before publishing.",
+    logoHelp: "Optional JPG, PNG, WebP, HEIC, or HEIF, up to 4 MB. Every new logo is safety-checked before publishing.",
     currentLogoAlt: "Current logo for {name}",
     optional: "Optional",
     save: "Save public profile",
@@ -201,7 +207,14 @@ export function ApprovedClubProfileForm({ club }: { club: EditableClubProfile })
 
       <form action={formAction} className="mt-5">
         <input type="hidden" name="clubId" value={club.id} />
+        <div className="mb-5 grid gap-3 rounded-xl border border-black/10 bg-[#F7F5EF] p-4 sm:grid-cols-2"><div><p className="text-[11px] font-black uppercase tracking-[0.08em] text-black/45">Official club name</p><p className="mt-1 font-semibold">{club.name}</p></div><div><p className="text-[11px] font-black uppercase tracking-[0.08em] text-black/45">University</p><p className="mt-1 font-semibold">{club.universityName}</p></div><p className="text-xs leading-5 text-black/50 sm:col-span-2">These verified identity fields require Cadesca review. Contact support to request a change.</p></div>
         <fieldset disabled={pending} aria-label={copy.title} className="grid gap-4 sm:grid-cols-2 disabled:opacity-70">
+          <ProfileField label="Club acronym" optional={copy.optional}>
+            <input name="acronym" maxLength={20} defaultValue={club.acronym || ""} className={eventInput} />
+          </ProfileField>
+          <ProfileField label="Category" optional={copy.optional}>
+            <input name="category" maxLength={80} defaultValue={club.category || ""} className={eventInput} />
+          </ProfileField>
           <ProfileField label={copy.contactEmail}>
             <input name="contactEmail" type="email" required maxLength={254} autoComplete="email" defaultValue={club.contactEmail} className={eventInput} />
           </ProfileField>
@@ -211,6 +224,9 @@ export function ApprovedClubProfileForm({ club }: { club: EditableClubProfile })
           <ProfileField label={copy.instagram} optional={copy.optional}>
             <input name="instagramUrl" type="url" maxLength={2048} inputMode="url" defaultValue={club.instagramUrl || ""} className={eventInput} />
           </ProfileField>
+          <ProfileField label="LinkedIn" optional={copy.optional}>
+            <input name="linkedinUrl" type="url" maxLength={2048} inputMode="url" defaultValue={club.linkedinUrl || ""} className={eventInput} />
+          </ProfileField>
           <ProfileField label={copy.universityPage} optional={copy.optional}>
             <input name="universityPageUrl" type="url" maxLength={2048} inputMode="url" defaultValue={club.universityPageUrl || ""} className={eventInput} />
           </ProfileField>
@@ -218,8 +234,12 @@ export function ApprovedClubProfileForm({ club }: { club: EditableClubProfile })
             <textarea name="description" required minLength={20} maxLength={4000} rows={6} defaultValue={club.description} className={`${eventInput} resize-y`} />
           </ProfileField>
           <ProfileField label={copy.logo} optional={copy.optional}>
-            <input name="logo" type="file" accept="image/jpeg,image/png,image/webp" aria-describedby={logoHelpId} className="block min-h-11 w-full rounded-xl border border-black/25 bg-white px-3.5 py-2 text-[13px] file:mr-3 file:rounded-lg file:border file:border-black file:bg-[#fff5c2] file:px-3 file:py-1.5 file:text-[12px] file:font-black" />
+            <input name="logo" type="file" accept={CLUB_IMAGE_ACCEPT} aria-describedby={logoHelpId} className="block min-h-11 w-full rounded-xl border border-black/25 bg-white px-3.5 py-2 text-[13px] file:mr-3 file:rounded-lg file:border file:border-black file:bg-[#fff5c2] file:px-3 file:py-1.5 file:text-[12px] file:font-black" />
             <span id={logoHelpId} className="mt-1.5 block text-[11px] font-semibold leading-4 text-black/50">{copy.logoHelp}</span>
+          </ProfileField>
+          <ProfileField label="Replace cover image" optional={copy.optional}>
+            <input name="cover" type="file" accept={CLUB_IMAGE_ACCEPT} className="block min-h-11 w-full rounded-xl border border-black/25 bg-white px-3.5 py-2 text-[13px] file:mr-3 file:rounded-lg file:border file:border-black file:bg-[#fff5c2] file:px-3 file:py-1.5 file:text-[12px] file:font-black" />
+            <span className="mt-1.5 block text-[11px] font-semibold leading-4 text-black/50">Optional image, up to 4 MB. Existing cover: {club.coverImageUrl ? "yes" : "none"}.</span>
           </ProfileField>
         </fieldset>
         <button type="submit" disabled={pending} className={`${eventPrimaryButton} mt-5 w-full sm:w-auto`}>

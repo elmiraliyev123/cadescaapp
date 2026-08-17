@@ -1,0 +1,26 @@
+import Image from "next/image";
+import Link from "next/link";
+
+import { archiveClubPostAction, deleteClubPostAction, duplicateClubPostAction } from "@/app/app/club/posts/actions";
+import { hasClubCapability } from "@/lib/clubs/permissions";
+import { listClubManagedPosts } from "@/lib/server/clubPosts";
+import { getCurrentClubDashboardBySlug } from "@/lib/server/events";
+
+export const dynamic = "force-dynamic";
+const FILTERS = ["published", "draft", "scheduled", "archived"] as const;
+
+export default async function ManagedClubPostsPage({ params, searchParams }: { params: Promise<{ clubSlug: string }>; searchParams: Promise<{ status?: string }> }) {
+  const [{ clubSlug }, search] = await Promise.all([params, searchParams]);
+  const dashboard = await getCurrentClubDashboardBySlug(clubSlug);
+  if (!dashboard) return null;
+  const selected = FILTERS.includes(search.status as (typeof FILTERS)[number]) ? search.status as (typeof FILTERS)[number] : "published";
+  const posts = (await listClubManagedPosts(dashboard.club.id)).filter((post) => post.publicationStatus === selected);
+  const base = `/dashboard/${dashboard.club.slug}`;
+  const canCreate = hasClubCapability(dashboard.roles, "club.posts.create");
+  const canUpdate = hasClubCapability(dashboard.roles, "club.posts.update");
+  const canDelete = hasClubCapability(dashboard.roles, "club.posts.delete");
+  return <><header className="flex flex-col gap-4 border-b border-black/15 pb-6 sm:flex-row sm:items-end sm:justify-between"><div><p className="text-xs font-bold uppercase tracking-[0.15em] text-black/45">Content</p><h1 className="mt-2 text-4xl font-semibold tracking-[-0.045em]">Posts</h1><p className="mt-2 text-sm text-black/55">Plan and publish Cadesca content as {dashboard.club.name}.</p></div>{canCreate ? <Link href={`${base}/posts/new`} className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border border-black bg-[#FFD84D] px-4 text-sm font-bold"><span className="material-symbols-outlined text-[19px]" aria-hidden="true">add</span>Create post</Link> : null}</header>
+    <nav aria-label="Post filters" className="mt-5 overflow-x-auto"><div className="flex min-w-max gap-2">{FILTERS.map((filter) => <Link key={filter} href={`${base}/posts?status=${filter}`} aria-current={selected === filter ? "page" : undefined} className={`inline-flex min-h-10 items-center rounded-full border px-3.5 text-xs font-bold capitalize ${selected === filter ? "border-black bg-black text-white" : "border-black/15 bg-white"}`}>{filter}</Link>)}</div></nav>
+    {posts.length ? <section className="mt-5 space-y-3">{posts.map((post) => <article key={post.id} className="grid gap-4 rounded-2xl border border-black/10 bg-white p-4 sm:grid-cols-[88px_minmax(0,1fr)_auto] sm:items-center"><div className="relative aspect-square overflow-hidden rounded-xl bg-[#F3F1EA]">{post.imageUrl ? <Image src={post.imageUrl} alt="" fill sizes="88px" className="object-cover" /> : <span className="material-symbols-outlined flex h-full items-center justify-center text-3xl text-black/35" aria-hidden="true">article</span>}</div><div className="min-w-0"><div className="flex flex-wrap items-center gap-2"><span className="rounded-full bg-black/5 px-2 py-1 text-[10px] font-bold uppercase">{post.publicationStatus}</span><span className="text-xs text-black/40">by {post.authorName}</span></div><h2 className="mt-2 line-clamp-1 font-semibold">{post.title || post.body || "Media post"}</h2><p className="mt-1 text-xs text-black/45">{post.scheduledAt ? `Scheduled ${new Date(post.scheduledAt).toLocaleString()}` : new Date(post.createdAt).toLocaleString()}</p></div><div className="flex flex-wrap gap-2 sm:justify-end">{canUpdate && post.publicationStatus !== "archived" ? <Link href={`${base}/posts/${post.id}/edit`} className="inline-flex min-h-10 items-center rounded-xl border border-black px-3 text-xs font-bold">Edit</Link> : null}{canCreate ? <form action={duplicateClubPostAction}><input type="hidden" name="clubId" value={dashboard.club.id} /><input type="hidden" name="postId" value={post.id} /><button className="min-h-10 rounded-xl border border-black px-3 text-xs font-bold">Duplicate</button></form> : null}{canUpdate && post.publicationStatus !== "archived" ? <form action={archiveClubPostAction}><input type="hidden" name="clubId" value={dashboard.club.id} /><input type="hidden" name="postId" value={post.id} /><button className="min-h-10 rounded-xl border border-black px-3 text-xs font-bold">Archive</button></form> : null}{canDelete ? <form action={deleteClubPostAction}><input type="hidden" name="clubId" value={dashboard.club.id} /><input type="hidden" name="postId" value={post.id} /><button className="min-h-10 rounded-xl bg-black px-3 text-xs font-bold text-white">Delete</button></form> : null}</div></article>)}</section> : <section className="mt-6 rounded-2xl border border-dashed border-black/25 bg-white px-5 py-10 text-center"><span className="material-symbols-outlined text-4xl" aria-hidden="true">post_add</span><h2 className="mt-3 text-xl font-semibold">No {selected} posts</h2>{canCreate && selected === "published" ? <Link href={`${base}/posts/new`} className="mt-5 inline-flex min-h-11 items-center rounded-xl bg-[#FFD84D] px-4 text-sm font-bold">Create post</Link> : null}</section>}
+  </>;
+}

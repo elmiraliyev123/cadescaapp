@@ -14,6 +14,7 @@ import {
   inviteClubMember,
   revokeClubMembership,
   revokeScannerFromEvent,
+  setEventRegistrationOpen,
   submitEventForReview,
   updateEventDraft,
   updateEventCapacity,
@@ -58,9 +59,12 @@ function eventInput(formData: FormData): EventDraftInput {
   const isFree = checked(formData, "isFree");
   return {
     title: text(formData, "title"),
+    shortDescription: text(formData, "shortDescription") || null,
     description: text(formData, "description"),
     location: text(formData, "location"),
     venueDetails: text(formData, "venueDetails") || null,
+    venueName: text(formData, "venueName") || null,
+    venueAddress: text(formData, "venueAddress") || null,
     startAt: text(formData, "startAt"),
     endAt: text(formData, "endAt"),
     timezone: text(formData, "timezone") || "Europe/Istanbul",
@@ -69,6 +73,7 @@ function eventInput(formData: FormData): EventDraftInput {
     isFree,
     capacity: Number(text(formData, "capacity")),
     ticketRequestDeadline: text(formData, "ticketRequestDeadline"),
+    registrationStartsAt: text(formData, "registrationStartsAt") || null,
     bankTransferEnabled: checked(formData, "bankTransferEnabled"),
     cashPaymentEnabled: checked(formData, "cashPaymentEnabled"),
     freeTicketMode: text(formData, "freeTicketMode") === "organizer_approval" ? "organizer_approval" : "automatic",
@@ -76,7 +81,11 @@ function eventInput(formData: FormData): EventDraftInput {
     ibanAccountName: text(formData, "ibanAccountName") || null,
     paymentInstructions: text(formData, "paymentInstructions") || null,
     refundPolicy: text(formData, "refundPolicy"),
-    ageRequirement: text(formData, "ageRequirement") ? Number(text(formData, "ageRequirement")) : null
+    ageRequirement: text(formData, "ageRequirement") ? Number(text(formData, "ageRequirement")) : null,
+    visibility: (["public", "university", "private"].includes(text(formData, "visibility")) ? text(formData, "visibility") : "university") as EventDraftInput["visibility"],
+    organizerContact: text(formData, "organizerContact") || null,
+    externalLink: text(formData, "externalLink") || null,
+    tags: text(formData, "tags").split(",").map((tag) => tag.trim()).filter(Boolean)
   };
 }
 
@@ -211,6 +220,24 @@ export async function updateEventCapacityAction(
   }
 }
 
+export async function setEventRegistrationAction(
+  _previousState: ClubActionState = EMPTY_STATE,
+  formData: FormData
+): Promise<ClubActionState> {
+  const eventId = text(formData, "eventId");
+  try {
+    const open = text(formData, "registrationAction") === "open";
+    await setEventRegistrationOpen(eventId, open);
+    revalidatePath("/app/club");
+    revalidatePath(`/app/club/events/${eventId}`);
+    revalidatePath("/app/user/events");
+    revalidatePath("/events");
+    return { ok: true, message: open ? "Registration reopened." : "Registration closed.", eventId };
+  } catch (error) {
+    return { ok: false, message: actionMessage(error), eventId };
+  }
+}
+
 export async function inviteClubMemberAction(
   _previousState: ClubActionState = EMPTY_STATE,
   formData: FormData
@@ -298,15 +325,20 @@ export async function updateApprovedClubProfileAction(
 ): Promise<ClubProfileActionState> {
   const clubId = text(formData, "clubId");
   const logoValue = formData.get("logo");
+  const coverValue = formData.get("cover");
   try {
     await updateApprovedClubProfile({
       clubId,
+      acronym: text(formData, "acronym") || null,
+      category: text(formData, "category") || null,
       description: text(formData, "description"),
       contactEmail: text(formData, "contactEmail"),
       websiteUrl: text(formData, "websiteUrl") || null,
       instagramUrl: text(formData, "instagramUrl") || null,
+      linkedinUrl: text(formData, "linkedinUrl") || null,
       universityPageUrl: text(formData, "universityPageUrl") || null,
-      logo: logoValue instanceof File && logoValue.size ? logoValue : null
+      logo: logoValue instanceof File && logoValue.size ? logoValue : null,
+      cover: coverValue instanceof File && coverValue.size ? coverValue : null
     });
     revalidatePath("/app/club");
     revalidatePath("/app/user/events");
@@ -314,10 +346,20 @@ export async function updateApprovedClubProfileAction(
     return { ok: true, message: "updated" };
   } catch (error) {
     if (error instanceof StudentClubError) {
-      if (error.code === "invalid_upload" && error.status >= 500) {
+      if (
+        (error.code === "invalid_upload" && error.status >= 500) ||
+        error.code === "image_moderation_unavailable" ||
+        error.code === "image_upload_failed"
+      ) {
         return { ok: false, message: "upload_failed" };
       }
-      if (error.code === "club_profile_invalid" || error.code === "invalid_upload") {
+      if (
+        error.code === "club_profile_invalid" ||
+        error.code === "invalid_upload" ||
+        error.code === "unsupported_image_type" ||
+        error.code === "image_file_too_large" ||
+        error.code === "image_rejected"
+      ) {
         return { ok: false, message: "invalid" };
       }
       if (error.code === "club_profile_access_denied" || error.code === "authentication_required") {

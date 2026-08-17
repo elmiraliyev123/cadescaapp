@@ -87,10 +87,13 @@ type EventRow = {
   university_id: string;
   university_name: string;
   title: string;
+  short_description: string | null;
   description: string;
   cover_image_url: string | null;
   location: string;
   venue_details: string | null;
+  venue_name: string | null;
+  venue_address: string | null;
   start_at: Date | string;
   end_at: Date | string;
   timezone: string;
@@ -100,6 +103,8 @@ type EventRow = {
   capacity: number;
   available_slots: number;
   ticket_request_deadline: Date | string;
+  registration_starts_at: Date | string | null;
+  registration_ends_at: Date | string | null;
   bank_transfer_enabled: boolean;
   cash_payment_enabled: boolean;
   free_ticket_mode: FreeTicketMode;
@@ -111,6 +116,9 @@ type EventRow = {
   published_at: Date | string | null;
   moderation_status: "active" | "platform_suspended";
   visibility: "public" | "university" | "private";
+  organizer_contact: string | null;
+  external_link: string | null;
+  tags: string[];
 };
 
 type TicketRow = {
@@ -149,12 +157,17 @@ type ClubRow = {
   university_id: string;
   name: string;
   slug: string;
+  university_name: string;
+  acronym: string | null;
+  category: string | null;
   description: string;
   logo_url: string | null;
+  cover_image_url: string | null;
   official_email: string;
   contact_email: string;
   website_url: string | null;
   instagram_url: string | null;
+  social_links: Record<string, unknown>;
   university_page_url: string | null;
   updated_at: Date | string;
   status: ClubDashboard["club"]["status"];
@@ -164,9 +177,12 @@ type ClubRow = {
 
 export type EventDraftInput = {
   title: string;
+  shortDescription?: string | null;
   description: string;
   location: string;
   venueDetails?: string | null;
+  venueName?: string | null;
+  venueAddress?: string | null;
   startAt: string;
   endAt: string;
   timezone: string;
@@ -175,6 +191,7 @@ export type EventDraftInput = {
   isFree: boolean;
   capacity: number;
   ticketRequestDeadline: string;
+  registrationStartsAt?: string | null;
   bankTransferEnabled: boolean;
   cashPaymentEnabled: boolean;
   freeTicketMode: FreeTicketMode;
@@ -183,6 +200,10 @@ export type EventDraftInput = {
   paymentInstructions?: string | null;
   refundPolicy: string;
   ageRequirement?: number | null;
+  visibility?: "public" | "university" | "private";
+  organizerContact?: string | null;
+  externalLink?: string | null;
+  tags?: string[];
 };
 
 function toIso(value: Date | string | null | undefined) {
@@ -207,6 +228,12 @@ function clubLogoUrl(clubId: string, storedValue: string | null) {
   return `/media/club/${encodeURIComponent(clubId)}`;
 }
 
+function clubCoverUrl(clubId: string, storedValue: string | null) {
+  if (!storedValue) return null;
+  if (/^https?:\/\//i.test(storedValue)) return storedValue;
+  return `/media/club-cover/${encodeURIComponent(clubId)}`;
+}
+
 function mapEvent(row: EventRow): EventDiscoveryItem {
   const availableSlots = Math.max(0, Number(row.available_slots));
   return {
@@ -217,10 +244,13 @@ function mapEvent(row: EventRow): EventDiscoveryItem {
     clubSlug: row.club_slug,
     clubLogoUrl: clubLogoUrl(row.club_id, row.club_logo_url),
     title: row.title,
+    shortDescription: row.short_description,
     description: row.description,
     coverImageUrl: eventCoverUrl(row.id, row.cover_image_url),
     location: row.location,
     venueDetails: row.venue_details,
+    venueName: row.venue_name,
+    venueAddress: row.venue_address,
     startAt: toIso(row.start_at) || "",
     endAt: toIso(row.end_at) || "",
     timezone: row.timezone,
@@ -230,6 +260,8 @@ function mapEvent(row: EventRow): EventDiscoveryItem {
     capacity: Number(row.capacity),
     availableSlots,
     ticketRequestDeadline: toIso(row.ticket_request_deadline) || "",
+    registrationStartsAt: toIso(row.registration_starts_at),
+    registrationEndsAt: toIso(row.registration_ends_at),
     bankTransferEnabled: row.bank_transfer_enabled,
     cashPaymentEnabled: row.cash_payment_enabled,
     freeTicketMode: row.free_ticket_mode,
@@ -239,7 +271,11 @@ function mapEvent(row: EventRow): EventDiscoveryItem {
     featuredStatus: row.featured_status,
     featuredUntil: toIso(row.featured_until),
     publishedAt: toIso(row.published_at),
-    moderationStatus: row.moderation_status
+    moderationStatus: row.moderation_status,
+    visibility: row.visibility,
+    organizerContact: row.organizer_contact,
+    externalLink: row.external_link,
+    tags: row.tags || []
   };
 }
 
@@ -337,9 +373,11 @@ async function activeClubRoles(userId: string, clubId: string) {
   const result = await pool.query<{ role: ClubRole }>(
     `select membership.role
        from public.club_memberships membership
+       join public.student_clubs club on club.id = membership.club_id
       where membership.club_id = $1
         and membership.user_id = $2
         and membership.status = 'active'
+        and club.status = 'approved'
         and membership.role = any($3::text[])`,
     [clubId, userId, EVENT_ROLES]
   );
@@ -363,10 +401,13 @@ const EVENT_SELECT = `
     event.university_id,
     university.name as university_name,
     event.title,
+    event.short_description,
     event.description,
     event.cover_image_url,
     event.location,
     event.venue_details,
+    event.venue_name,
+    event.venue_address,
     event.start_at,
     event.end_at,
     event.timezone,
@@ -376,6 +417,8 @@ const EVENT_SELECT = `
     event.capacity,
     greatest(event.capacity - coalesce(capacity_state.reserved_count, 0), 0)::int as available_slots,
     event.ticket_request_deadline,
+    event.registration_starts_at,
+    event.registration_ends_at,
     event.bank_transfer_enabled,
     event.cash_payment_enabled,
     event.free_ticket_mode,
@@ -386,7 +429,10 @@ const EVENT_SELECT = `
     event.featured_until,
     event.published_at,
     event.moderation_status,
-    event.visibility
+    event.visibility,
+    event.organizer_contact,
+    event.external_link,
+    event.tags
   from public.events event
   join public.student_clubs club on club.id = event.club_id
   join public.universities university on university.id = event.university_id
@@ -641,12 +687,17 @@ async function resolveClubForUser(user: CurrentStudentContext, clubId?: string) 
        club.university_id,
        club.name,
        club.slug,
+       university.name as university_name,
+       club.acronym,
+       club.category,
        club.description,
        club.logo_url,
+       club.cover_image_url,
        club.official_email,
        club.contact_email,
        club.website_url,
        club.instagram_url,
+       club.social_links,
        club.university_page_url,
        club.updated_at,
        club.status,
@@ -654,8 +705,10 @@ async function resolveClubForUser(user: CurrentStudentContext, clubId?: string) 
        club.suspension_reason
      from public.student_clubs club
      join public.club_memberships membership on membership.club_id = club.id
+     join public.universities university on university.id = club.university_id
      where membership.user_id = $1
        and membership.status = 'active'
+       and club.status = 'approved'
        and ($2::uuid is null or club.id = $2::uuid)
      order by club.created_at asc
      limit 1`,
@@ -673,7 +726,7 @@ export async function getCurrentClubDashboard(
   const club = await resolveClubForUser(user, clubId);
   const roles = await activeClubRoles(user.id, club.id);
   const pool = await getReadyPool();
-  const canViewMembers = hasClubCapability(roles, "club.members.manage");
+  const canViewMembers = hasClubCapability(roles, "club.members.view");
   const canManageEvents = hasClubCapability(roles, "club.events.update");
 
   type MemberRow = {
@@ -699,7 +752,10 @@ export async function getCurrentClubDashboard(
               coalesce(app_user.display_name, app_user.name) as display_name,
               app_user.username,
               membership.role,
-              membership.status,
+              case
+                when membership.status = 'invited' and membership.invitation_expires_at <= now() then 'expired'
+                else membership.status
+              end as status,
               membership.created_at
          from public.club_memberships membership
          join public.users app_user on app_user.id = membership.user_id
@@ -788,12 +844,17 @@ export async function getCurrentClubDashboard(
       universityId: club.university_id,
       name: club.name,
       slug: club.slug,
+      universityName: club.university_name,
+      acronym: club.acronym,
+      category: club.category,
       description: club.description,
       logoUrl: clubLogoUrl(club.id, club.logo_url),
+      coverImageUrl: clubCoverUrl(club.id, club.cover_image_url),
       officialEmail: club.official_email,
       contactEmail: club.contact_email,
       websiteUrl: club.website_url,
       instagramUrl: club.instagram_url,
+      linkedinUrl: typeof club.social_links?.linkedin === "string" ? club.social_links.linkedin : null,
       universityPageUrl: club.university_page_url,
       updatedAt: toIso(club.updated_at) || "",
       status: club.status,
@@ -837,6 +898,35 @@ export async function getCurrentClubDashboard(
       conversionRate: totalRequests ? approved / totalRequests : 0
     }
   };
+}
+
+export async function getCurrentClubDashboardBySlug(
+  slugInput: string,
+  includePrivateEventConfiguration = false
+) {
+  const slug = slugInput.trim().toLowerCase();
+  if (!/^[a-z0-9](?:[a-z0-9-]{1,90}[a-z0-9])?$/.test(slug)) {
+    throw new EventsError("club_not_found", 404);
+  }
+  const user = await currentStudentRequired();
+  const pool = await getReadyPool();
+  const result = await pool.query<{ id: string }>(
+    `select club.id
+       from public.student_clubs club
+      where club.slug = $1
+        and club.status = 'approved'
+        and exists (
+          select 1
+            from public.club_memberships membership
+           where membership.club_id = club.id
+             and membership.user_id = $2
+             and membership.status = 'active'
+        )
+      limit 1`,
+    [slug, user.id]
+  );
+  if (!result.rows[0]) throw new EventsError("club_not_found", 404);
+  return getCurrentClubDashboard(result.rows[0].id, includePrivateEventConfiguration);
 }
 
 export async function getClubEventOperations(eventId: string): Promise<ClubEventOperations> {
@@ -1148,27 +1238,49 @@ export async function listAssignedScannerEvents(clubId?: string): Promise<Scanne
 
 function validateEventDraft(input: EventDraftInput) {
   const title = input.title.trim();
+  const shortDescription = input.shortDescription?.trim() || null;
   const description = input.description.trim();
   const location = input.location.trim();
+  const venueName = input.venueName?.trim() || location;
+  const venueAddress = input.venueAddress?.trim() || null;
   const timezone = input.timezone.trim();
   const currency = input.currency.trim().toUpperCase();
   const refundPolicy = input.refundPolicy.trim();
   const startAt = new Date(input.startAt);
   const endAt = new Date(input.endAt);
   const deadline = new Date(input.ticketRequestDeadline);
+  const registrationStartsAt = input.registrationStartsAt ? new Date(input.registrationStartsAt) : null;
   const ticketPrice = Number(input.ticketPrice);
   const capacity = Number(input.capacity);
   const ageRequirement = input.ageRequirement === null || input.ageRequirement === undefined ? null : Number(input.ageRequirement);
+  const visibility = input.visibility || "university";
+  const organizerContact = input.organizerContact?.trim() || null;
+  const tags = Array.from(new Set((input.tags || []).map((tag) => tag.trim().toLowerCase()).filter(Boolean))).slice(0, 12);
+  let externalLink: string | null = null;
+  if (input.externalLink?.trim()) {
+    try {
+      const parsed = new URL(input.externalLink.trim());
+      if (!['http:', 'https:'].includes(parsed.protocol)) throw new Error("invalid_protocol");
+      externalLink = parsed.toString();
+    } catch {
+      throw new EventsError("event_invalid", 422);
+    }
+  }
 
   if (
     title.length < 3 || title.length > 140 ||
+    (shortDescription !== null && (shortDescription.length < 3 || shortDescription.length > 240)) ||
     description.length < 20 || description.length > 10_000 ||
     location.length < 2 || location.length > 240 ||
+    venueName.length > 240 ||
+    (venueAddress !== null && venueAddress.length > 500) ||
     !timezone || timezone.length > 80 ||
     !currency || currency.length !== 3 ||
     refundPolicy.length < 5 || refundPolicy.length > 2_000 ||
     !Number.isFinite(startAt.getTime()) || !Number.isFinite(endAt.getTime()) || !Number.isFinite(deadline.getTime()) ||
+    (registrationStartsAt !== null && !Number.isFinite(registrationStartsAt.getTime())) ||
     endAt <= startAt || deadline >= startAt ||
+    (registrationStartsAt !== null && registrationStartsAt >= deadline) ||
     !Number.isInteger(capacity) || capacity <= 0 || capacity > 100_000 ||
     !Number.isFinite(ticketPrice) || ticketPrice < 0 || ticketPrice > 10_000_000 ||
     (ageRequirement !== null && (!Number.isInteger(ageRequirement) || ageRequirement < 0 || ageRequirement > 99)) ||
@@ -1176,15 +1288,21 @@ function validateEventDraft(input: EventDraftInput) {
     (!input.isFree && ticketPrice <= 0) ||
     (!input.isFree && !input.bankTransferEnabled && !input.cashPaymentEnabled) ||
     (input.bankTransferEnabled && (!input.iban?.trim() || !input.ibanAccountName?.trim()))
+    || !["public", "university", "private"].includes(visibility)
+    || (organizerContact !== null && organizerContact.length > 254)
+    || tags.some((tag) => tag.length > 40)
   ) {
     throw new EventsError("event_invalid", 422);
   }
 
   return {
     title,
+    shortDescription,
     description,
     location,
     venueDetails: input.venueDetails?.trim() || null,
+    venueName,
+    venueAddress,
     startAt: startAt.toISOString(),
     endAt: endAt.toISOString(),
     timezone,
@@ -1193,6 +1311,7 @@ function validateEventDraft(input: EventDraftInput) {
     isFree: input.isFree,
     capacity,
     ticketRequestDeadline: deadline.toISOString(),
+    registrationStartsAt: registrationStartsAt?.toISOString() || null,
     bankTransferEnabled: !input.isFree && input.bankTransferEnabled,
     cashPaymentEnabled: !input.isFree && input.cashPaymentEnabled,
     freeTicketMode: input.freeTicketMode,
@@ -1200,7 +1319,11 @@ function validateEventDraft(input: EventDraftInput) {
     ibanAccountName: !input.isFree && input.bankTransferEnabled ? input.ibanAccountName!.trim() : null,
     paymentInstructions: input.paymentInstructions?.trim() || null,
     refundPolicy,
-    ageRequirement
+    ageRequirement,
+    visibility,
+    organizerContact,
+    externalLink,
+    tags
   };
 }
 
@@ -1358,16 +1481,19 @@ export async function createEventDraft(clubId: string, input: EventDraftInput, c
 
     const result = await client.query<{ id: string }>(
       `insert into public.events (
-         club_id, university_id, title, slug, description, location, venue_details,
+         club_id, university_id, title, slug, short_description, description, location, venue_details,
+         venue_name, venue_address,
          start_at, end_at, timezone, ticket_price, currency, is_free, capacity,
          ticket_request_deadline, bank_transfer_enabled, cash_payment_enabled,
          free_ticket_mode, iban, iban_account_name, payment_instructions, refund_policy,
-         age_requirement, status, created_by, updated_by
+         age_requirement, registration_starts_at, registration_ends_at, visibility,
+         organizer_contact, external_link, tags, status, created_by, updated_by
        ) values (
-         $1, $2, $3, $4, $5, $6, $7,
-         $8, $9, $10, $11, $12, $13, $14,
-         $15, $16, $17, $18, $19, $20, $21, $22,
-         $23, 'draft', $24, $24
+         $1, $2, $3, $4, $5, $6, $7, $8,
+         $9, $10,
+         $11, $12, $13, $14, $15, $16, $17,
+         $18, $19, $20, $21, $22, $23, $24, $25,
+         $26, $27, $18, $28, $29, $30, $31::text[], 'draft', $32, $32
        )
        returning id`,
       [
@@ -1375,9 +1501,12 @@ export async function createEventDraft(clubId: string, input: EventDraftInput, c
         club.university_id,
         normalized.title,
         slug,
+        normalized.shortDescription,
         normalized.description,
         normalized.location,
         normalized.venueDetails,
+        normalized.venueName,
+        normalized.venueAddress,
         normalized.startAt,
         normalized.endAt,
         normalized.timezone,
@@ -1394,6 +1523,11 @@ export async function createEventDraft(clubId: string, input: EventDraftInput, c
         normalized.paymentInstructions,
         normalized.refundPolicy,
         normalized.ageRequirement,
+        normalized.registrationStartsAt,
+        normalized.visibility,
+        normalized.organizerContact,
+        normalized.externalLink,
+        normalized.tags,
         user.id
       ]
     );
@@ -1473,38 +1607,50 @@ export async function updateEventDraft(eventId: string, input: EventDraftInput, 
     const updated = await client.query(
       `update public.events
           set title = $2,
-              description = $3,
-              cover_image_url = $4,
-              location = $5,
-              venue_details = $6,
-              start_at = $7,
-              end_at = $8,
-              timezone = $9,
-              ticket_price = $10,
-              currency = $11,
-              is_free = $12,
-              capacity = $13,
-              ticket_request_deadline = $14,
-              bank_transfer_enabled = $15,
-              cash_payment_enabled = $16,
-              free_ticket_mode = $17,
-              iban = $18,
-              iban_account_name = $19,
-              payment_instructions = $20,
-              refund_policy = $21,
-              age_requirement = $22,
+              short_description = $3,
+              description = $4,
+              cover_image_url = $5,
+              location = $6,
+              venue_details = $7,
+              venue_name = $8,
+              venue_address = $9,
+              start_at = $10,
+              end_at = $11,
+              timezone = $12,
+              ticket_price = $13,
+              currency = $14,
+              is_free = $15,
+              capacity = $16,
+              ticket_request_deadline = $17,
+              registration_starts_at = $18,
+              registration_ends_at = $17,
+              bank_transfer_enabled = $19,
+              cash_payment_enabled = $20,
+              free_ticket_mode = $21,
+              iban = $22,
+              iban_account_name = $23,
+              payment_instructions = $24,
+              refund_policy = $25,
+              age_requirement = $26,
+              visibility = $27,
+              organizer_contact = $28,
+              external_link = $29,
+              tags = $30::text[],
               status = 'draft',
               rejection_reason = null,
-              updated_by = $23,
+              updated_by = $31,
               updated_at = now()
         where id = $1::uuid`,
       [
         eventId,
         normalized.title,
+        normalized.shortDescription,
         normalized.description,
         objectPath,
         normalized.location,
         normalized.venueDetails,
+        normalized.venueName,
+        normalized.venueAddress,
         normalized.startAt,
         normalized.endAt,
         normalized.timezone,
@@ -1513,6 +1659,7 @@ export async function updateEventDraft(eventId: string, input: EventDraftInput, 
         normalized.isFree,
         normalized.capacity,
         normalized.ticketRequestDeadline,
+        normalized.registrationStartsAt,
         normalized.bankTransferEnabled,
         normalized.cashPaymentEnabled,
         normalized.freeTicketMode,
@@ -1521,6 +1668,10 @@ export async function updateEventDraft(eventId: string, input: EventDraftInput, 
         normalized.paymentInstructions,
         normalized.refundPolicy,
         normalized.ageRequirement,
+        normalized.visibility,
+        normalized.organizerContact,
+        normalized.externalLink,
+        normalized.tags,
         user.id
       ]
     );
@@ -1939,6 +2090,64 @@ export async function updateEventCapacity(eventId: string, requestedCapacity: nu
   }
 }
 
+export async function setEventRegistrationOpen(eventId: string, open: boolean) {
+  const actor = await currentStudentRequired();
+  if (!/^[0-9a-f-]{36}$/i.test(eventId)) throw new EventsError("event_not_found", 404);
+  const pool = await getReadyPool();
+  const client = await pool.connect();
+  try {
+    await client.query("begin");
+    const result = await client.query<{
+      club_id: string;
+      university_id: string;
+      status: EventStatus;
+      moderation_status: string;
+      start_at: Date | string;
+      ticket_request_deadline: Date | string;
+      registration_ends_at: Date | string | null;
+    }>(
+      `select club_id, university_id, status, moderation_status, start_at,
+              ticket_request_deadline, registration_ends_at
+         from public.events where id = $1::uuid for update`,
+      [eventId]
+    );
+    const event = result.rows[0];
+    if (!event) throw new EventsError("event_not_found", 404);
+    if (event.moderation_status !== "active" || !(["published", "sold_out"] as EventStatus[]).includes(event.status)) {
+      throw new EventsError("event_not_editable", 409);
+    }
+    const membership = await client.query(
+      `select 1 from public.club_memberships
+        where club_id = $1::uuid and user_id = $2 and status = 'active'
+          and role = any($3::text[]) limit 1 for share`,
+      [event.club_id, actor.id, rolesWithClubCapability("club.events.update")]
+    );
+    if (!membership.rows[0]) throw new EventsError("club_access_denied", 403);
+    const now = new Date();
+    const startAt = new Date(event.start_at);
+    const currentDeadline = new Date(event.ticket_request_deadline);
+    const originalDeadline = event.registration_ends_at ? new Date(event.registration_ends_at) : currentDeadline;
+    if (startAt <= now || (open && originalDeadline <= now)) throw new EventsError("event_not_editable", 409);
+    if ((open && currentDeadline > now) || (!open && currentDeadline <= now)) throw new EventsError("event_not_editable", 409);
+    const nextDeadline = open ? originalDeadline : now;
+    await client.query(
+      `update public.events set ticket_request_deadline = $2, updated_by = $3, updated_at = now() where id = $1::uuid`,
+      [eventId, nextDeadline.toISOString(), actor.id]
+    );
+    await client.query(
+      `insert into public.event_audit_logs (university_id, club_id, event_id, actor_user_id, action, metadata)
+       values ($1::uuid, $2::uuid, $3::uuid, $4, $5, jsonb_build_object('registration_open', $6::boolean))`,
+      [event.university_id, event.club_id, eventId, actor.id, open ? "registration_reopened" : "registration_closed", open]
+    );
+    await client.query("commit");
+  } catch (error) {
+    await client.query("rollback").catch(() => undefined);
+    throw error;
+  } finally {
+    client.release();
+  }
+}
+
 export async function listAdminEventModeration() {
   const pool = await getReadyPool();
   const result = await pool.query<EventRow>(
@@ -2157,11 +2366,11 @@ export async function setEventModerationAsAdmin(input: {
 export async function inviteClubMember(input: {
   clubId: string;
   usernameOrEmail: string;
-  role: Exclude<ClubRole, "club_owner">;
+  role: ClubRole;
 }) {
   const actor = await currentStudentRequired();
   const identifier = input.usernameOrEmail.trim().replace(/^@/, "").toLowerCase();
-  if (!identifier || !CLUB_ROLES.includes(input.role)) {
+  if (!identifier || !CLUB_ROLES.includes(input.role) || input.role === "club_owner") {
     throw new EventsError("club_member_invalid", 422);
   }
   const pool = await getReadyPool();
@@ -2199,22 +2408,33 @@ export async function inviteClubMember(input: {
     if (!target) throw new EventsError("club_member_not_found", 404);
     const membership = await client.query<{ id: string }>(
       `insert into public.club_memberships (
-         club_id, user_id, role, status, invited_by, invited_at
-       ) values ($1, $2, $3, 'invited', $4, now())
+         club_id, user_id, role, status, invited_by, invited_at, invitation_expires_at
+       ) values ($1, $2, $3, 'invited', $4, now(), now() + interval '14 days')
        on conflict (club_id, user_id, role) do update
-         set status = case when club_memberships.status in ('revoked', 'left') then 'invited' else club_memberships.status end,
+         set status = 'invited',
              invited_by = excluded.invited_by,
              invited_at = now(),
+             invitation_expires_at = now() + interval '14 days',
              revoked_at = null,
              revoked_by = null,
              updated_at = now()
+       where club_memberships.status in ('revoked', 'left')
+          or (club_memberships.status = 'invited' and club_memberships.invitation_expires_at <= now())
        returning id`,
       [input.clubId, target.id, input.role, actor.id]
     );
+    if (!membership.rows[0]) throw new EventsError("club_membership_not_editable", 409);
     await client.query(
       `insert into public.event_audit_logs (university_id, club_id, actor_user_id, action, metadata)
        values ($1, $2, $3, 'member_invited', jsonb_build_object('membership_id', $4::text, 'role', $5::text))`,
       [club.university_id, input.clubId, actor.id, membership.rows[0]?.id, input.role]
+    );
+    await client.query(
+      `insert into public.club_audit_logs (
+         club_id, actor_user_id, action, entity_type, entity_id, after_data, metadata
+       ) values ($1::uuid, $2, 'member_invited', 'club_membership', $3,
+                 jsonb_build_object('role', $4::text, 'status', 'invited'), '{}'::jsonb)`,
+      [input.clubId, actor.id, membership.rows[0]?.id, input.role]
     );
     await client.query(
       `insert into public.notifications (user_id, type, title, body, href, actor_type, actor_id, metadata)
@@ -2246,6 +2466,7 @@ export async function acceptClubMembership(membershipId: string) {
         where membership.id = $1::uuid
           and membership.user_id = $2
           and membership.status = 'invited'
+          and membership.invitation_expires_at > now()
           and club.status = 'approved'
           and club.university_id = app_user.university_id
         for update of membership
@@ -2265,6 +2486,13 @@ export async function acceptClubMembership(membershipId: string) {
        values ($1, $2, $3, 'membership_accepted', jsonb_build_object('membership_id', $4::text))`,
       [target.university_id, target.club_id, user.id, membershipId]
     );
+    await client.query(
+      `insert into public.club_audit_logs (
+         club_id, actor_user_id, action, entity_type, entity_id, before_data, after_data, metadata
+       ) values ($1::uuid, $2, 'membership_accepted', 'club_membership', $3,
+                 jsonb_build_object('status', 'invited'), jsonb_build_object('status', 'active'), '{}'::jsonb)`,
+      [target.club_id, user.id, membershipId]
+    );
     await client.query("commit");
   } catch (error) {
     await client.query("rollback").catch(() => undefined);
@@ -2281,7 +2509,7 @@ export async function revokeClubMembership(clubId: string, membershipId: string)
   try {
     await client.query("begin");
     const club = await client.query<{ university_id: string }>(
-      `select university_id from public.student_clubs where id = $1::uuid for share`,
+      `select university_id from public.student_clubs where id = $1::uuid and status = 'approved' for share`,
       [clubId]
     );
     if (!club.rows[0]) throw new EventsError("club_not_found", 404);
@@ -2318,6 +2546,14 @@ export async function revokeClubMembership(clubId: string, membershipId: string)
       `insert into public.event_audit_logs (university_id, club_id, actor_user_id, action, metadata)
        values ($1, $2, $3, 'role_revoked', jsonb_build_object('membership_id', $4::text, 'role', $5::text))`,
       [club.rows[0].university_id, clubId, actor.id, membershipId, result.rows[0].role]
+    );
+    await client.query(
+      `insert into public.club_audit_logs (
+         club_id, actor_user_id, action, entity_type, entity_id, before_data, after_data, metadata
+       ) values ($1::uuid, $2, 'member_role_revoked', 'club_membership', $3,
+                 jsonb_build_object('role', $4::text, 'status', 'active'),
+                 jsonb_build_object('role', $4::text, 'status', 'revoked'), '{}'::jsonb)`,
+      [clubId, actor.id, membershipId, result.rows[0].role]
     );
     await client.query(
       `insert into public.notifications (user_id, type, title, body, href, actor_type, actor_id, metadata)

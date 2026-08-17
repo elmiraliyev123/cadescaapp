@@ -4,6 +4,7 @@ import { NextResponse } from "next/server";
 import { getStudentClubUrl } from "@/lib/appConfig";
 import { exchangeAuthorizationCode, OAuthError, userInfoForAccessToken } from "@/lib/server/oauth";
 import { verifyOAuthClientState } from "@/lib/server/oauthClientState";
+import { getCurrentStudentContext } from "@/lib/server/social";
 
 export const runtime = "nodejs";
 
@@ -28,7 +29,7 @@ export async function GET(request: Request) {
   const suppliedState = url.searchParams.get("state") || "";
   const code = url.searchParams.get("code") || "";
   const returnedError = url.searchParams.get("error");
-  const fallback = new URL("/application", getStudentClubUrl());
+  const fallback = new URL("/", getStudentClubUrl());
 
   if (!clientState || suppliedState !== clientState.state || returnedError || !code) {
     fallback.searchParams.set("auth_error", returnedError || "invalid_callback");
@@ -41,15 +42,21 @@ export async function GET(request: Request) {
       clientId: "studentclub",
       code,
       redirectUri: `${getStudentClubUrl()}/auth/callback`,
-      codeVerifier: clientState.verifier
+      codeVerifier: clientState.verifier,
+      expectedNonce: clientState.nonce
     });
-    // Resolve the immutable Cadesca sub now. The existing same-project portal
-    // continues to use the secure shared Cadesca session for backend requests.
-    await userInfoForAccessToken(token.access_token);
-    return clearState(NextResponse.redirect(new URL(clientState.returnTo, getStudentClubUrl())));
+    // Resolve the immutable Cadesca sub. The access token remains server-only;
+    // Student Club continues with Cadesca's secure shared first-party session.
+    const identity = await userInfoForAccessToken(token.access_token);
+    const sessionUser = await getCurrentStudentContext();
+    if (!sessionUser || sessionUser.status !== "active" || sessionUser.id !== identity.sub) {
+      throw new OAuthError("invalid_grant", 401);
+    }
+    const resolver = new URL("/resolve", getStudentClubUrl());
+    if (clientState.returnTo !== "/resolve") resolver.searchParams.set("return_to", clientState.returnTo);
+    return clearState(NextResponse.redirect(resolver));
   } catch (error) {
     fallback.searchParams.set("auth_error", error instanceof OAuthError ? error.code : "server_error");
     return clearState(NextResponse.redirect(fallback));
   }
 }
-

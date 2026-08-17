@@ -2,7 +2,8 @@
 
 import Link from "next/link";
 
-import type { ClubApplicationView } from "@/lib/server/studentClubs";
+import { ClubApplicationUpdateForm } from "@/components/clubs/ClubApplicationUpdateForm";
+import type { ClubApplicationHistoryEntry, ClubApplicationView } from "@/lib/server/studentClubs";
 import { LanguageSwitcher } from "@/components/ui/LanguageSwitcher";
 import { Logo } from "@/components/ui/Logo";
 import { clubCopy } from "@/lib/clubs/localization";
@@ -24,11 +25,13 @@ function formatDate(value: string, language: string) {
 
 export function ClubStatusPanel({
   application,
+  history = [],
   authenticated,
   authHref,
   dashboardHref
 }: {
   application: ClubApplicationView | null;
+  history?: ClubApplicationHistoryEntry[];
   authenticated: boolean;
   authHref: string;
   dashboardHref: string;
@@ -102,7 +105,21 @@ export function ClubStatusPanel({
               </section>
             ) : null}
 
+            <section className="rounded-2xl border border-[#E4E1D8] bg-white p-6 shadow-sm">
+              <h2 className="text-lg font-semibold">Application progress</h2>
+              <ol className="mt-5 space-y-0">
+                {(history.length ? history : [{ id: "submitted", action: "submitted", reviewerComment: null, createdAt: application.createdAt }]).map((entry, index, entries) => (
+                  <li key={entry.id} className="grid grid-cols-[24px_1fr] gap-3">
+                    <span className="flex flex-col items-center"><span className="mt-1 h-3 w-3 rounded-full border-2 border-black bg-[#FFD84D]" />{index < entries.length - 1 ? <span className="min-h-10 w-px flex-1 bg-black/15" /> : null}</span>
+                    <span className="pb-5"><span className="block text-sm font-semibold capitalize">{entry.action.replaceAll("_", " ")}</span><time className="mt-1 block text-xs text-black/45" dateTime={entry.createdAt}>{formatDate(entry.createdAt, language)}</time>{entry.reviewerComment ? <span className="mt-2 block text-sm leading-6 text-black/60">{entry.reviewerComment}</span> : null}</span>
+                  </li>
+                ))}
+              </ol>
+            </section>
+
             <p className="rounded-xl bg-[#0A0A0A] p-5 text-sm leading-6 text-white/75">{copy("restrictedNotice")}</p>
+
+            {application.status === "clarification_requested" || application.status === "rejected" ? <ClubApplicationUpdateForm application={application} /> : null}
 
             {application.status === "approved" ? (
               <Link href={dashboardHref} className="inline-flex h-12 w-full items-center justify-center rounded-xl bg-[#FFD84D] px-5 font-semibold text-[#0A0A0A] hover:bg-[#F2C230]">

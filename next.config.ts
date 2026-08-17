@@ -4,9 +4,9 @@ const nextConfig: NextConfig = {
   allowedDevOrigins: ["192.168.1.165"],
   devIndicators: false,
   experimental: {
-    middlewareClientMaxBodySize: "15mb",
+    middlewareClientMaxBodySize: "4.3mb",
     serverActions: {
-      bodySizeLimit: "15mb"
+      bodySizeLimit: "4.3mb"
     }
   },
   outputFileTracingRoot: process.cwd()

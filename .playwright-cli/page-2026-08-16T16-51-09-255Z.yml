@@ -1,0 +1,91 @@
+- generic [active] [ref=f7e1]:
+  - main [ref=f7e3]:
+    - generic [ref=f7e5]:
+      - img "Cadesca" [ref=f7e7]
+      - generic [ref=f7e8]:
+        - button "TR" [ref=f7e9] [cursor=pointer]
+        - button "AZ" [ref=f7e10] [cursor=pointer]
+        - button "EN" [ref=f7e11] [cursor=pointer]
+        - button "RU" [ref=f7e12] [cursor=pointer]
+    - generic [ref=f7e13]:
+      - complementary [ref=f7e14]:
+        - paragraph [ref=f7e15]: New club application
+        - heading "Apply to join Cadesca" [level=1] [ref=f7e16]
+        - paragraph [ref=f7e17]: Tell us about your student club. Applications are reviewed before publishing and management tools are enabled.
+        - generic [ref=f7e18]:
+          - generic [ref=f7e19]: verified_user
+          - paragraph [ref=f7e21]: Before approval, you can save and manage this application only. Publishing, attendees, team roles and check-in become available after approval.
+      - generic [ref=f7e23]:
+        - navigation "Application progress" [ref=f7e24]:
+          - list [ref=f7e25]:
+            - listitem [ref=f7e26]:
+              - button "1 Club information" [ref=f7e27] [cursor=pointer]:
+                - generic [ref=f7e28]: "1"
+                - text: Club information
+            - listitem [ref=f7e29]:
+              - button "2 Contact" [ref=f7e30] [cursor=pointer]:
+                - generic [ref=f7e31]: "2"
+                - text: Contact
+            - listitem [ref=f7e32]:
+              - button "3 Leadership" [ref=f7e33] [cursor=pointer]:
+                - generic [ref=f7e34]: "3"
+                - text: Leadership
+            - listitem [ref=f7e35]:
+              - button "4 Verification" [ref=f7e36] [cursor=pointer]:
+                - generic [ref=f7e37]: "4"
+                - text: Verification
+            - listitem [ref=f7e38]:
+              - button "5 Review" [ref=f7e39] [cursor=pointer]:
+                - generic [ref=f7e40]: "5"
+                - text: Review
+        - generic [ref=f7e42]:
+          - paragraph [ref=f7e43]: Step 1 of 5
+          - heading "Club information" [level=2] [ref=f7e44]
+          - paragraph [ref=f7e45]: Tell us how the club should appear across Cadesca.
+          - generic [ref=f7e46]:
+            - generic [ref=f7e47]:
+              - generic [ref=f7e48]: University
+              - combobox "University" [ref=f7e49]:
+                - option "Select a university"
+                - option "ADA University"
+                - option "Azerbaijan State Oil and Industry University"
+                - option "Baku State University"
+                - option "Bilkent University" [selected]
+                - option "Boğaziçi University"
+                - option "Hacettepe University"
+                - option "Istanbul Technical University"
+                - option "Koç University"
+                - option "Middle East Technical University"
+                - option "MIT"
+                - option "Sabancı University"
+                - option "Stanford University"
+                - option "UNEC"
+            - generic [ref=f7e50]:
+              - generic [ref=f7e51]: Club name
+              - textbox "Club name" [ref=f7e52]
+            - generic [ref=f7e53]:
+              - generic [ref=f7e54]: Short name / acronym
+              - textbox "Short name / acronym" [ref=f7e55]:
+                - /placeholder: e.g. BILMUN
+            - generic [ref=f7e56]:
+              - generic [ref=f7e57]: Category
+              - textbox "Category" [ref=f7e58]:
+                - /placeholder: Academic, culture, sports…
+            - generic [ref=f7e59]:
+              - generic [ref=f7e60]: Founded year
+              - textbox "Founded year" [ref=f7e61]
+            - generic [ref=f7e62]:
+              - generic [ref=f7e63]: Description
+              - textbox "Description" [ref=f7e64]
+            - generic [ref=f7e65]:
+              - generic [ref=f7e66]: Club logo
+              - button "Club logo JPG, PNG, WebP, HEIC or HEIF, up to 4 MB." [ref=f7e67]
+              - generic [ref=f7e68]: JPG, PNG, WebP, HEIC or HEIF, up to 4 MB.
+            - generic [ref=f7e69]:
+              - generic [ref=f7e70]: Cover image (optional)
+              - button "Cover image (optional) JPG, PNG, WebP, HEIC or HEIF, up to 4 MB." [ref=f7e71]
+              - generic [ref=f7e72]: JPG, PNG, WebP, HEIC or HEIF, up to 4 MB.
+        - generic [ref=f7e73]:
+          - button "Save draft" [ref=f7e75] [cursor=pointer]
+          - button "Continue" [ref=f7e76] [cursor=pointer]
+  - alert [ref=f7e78]

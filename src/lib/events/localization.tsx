@@ -240,6 +240,7 @@ const statusEn: Record<EventPresentationStatus, string> = {
   event_manager: "Event manager",
   content_manager: "Content manager",
   club_member: "Member",
+  viewer: "Viewer",
   event_organizer: "Event organizer",
   finance_manager: "Finance manager",
   door_scanner: "Door scanner",

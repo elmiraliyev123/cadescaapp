@@ -58,10 +58,13 @@ export type EventDiscoveryItem = {
   clubSlug: string;
   clubLogoUrl: string | null;
   title: string;
+  shortDescription?: string | null;
   description: string;
   coverImageUrl: string | null;
   location: string;
   venueDetails: string | null;
+  venueName?: string | null;
+  venueAddress?: string | null;
   startAt: string;
   endAt: string;
   timezone: string;
@@ -71,6 +74,8 @@ export type EventDiscoveryItem = {
   capacity: number;
   availableSlots: number;
   ticketRequestDeadline: string;
+  registrationStartsAt?: string | null;
+  registrationEndsAt?: string | null;
   bankTransferEnabled: boolean;
   cashPaymentEnabled: boolean;
   freeTicketMode: FreeTicketMode;
@@ -81,6 +86,10 @@ export type EventDiscoveryItem = {
   featuredUntil: string | null;
   publishedAt: string | null;
   moderationStatus?: "active" | "platform_suspended";
+  visibility?: "public" | "university" | "private";
+  organizerContact?: string | null;
+  externalLink?: string | null;
+  tags?: string[];
 };
 
 export type EventDetail = EventDiscoveryItem & {
@@ -128,7 +137,7 @@ export type ClubMembershipView = {
   displayName: string;
   username: string | null;
   role: ClubRole;
-  status: "invited" | "active" | "revoked" | "left" | "suspended";
+  status: "invited" | "active" | "revoked" | "left" | "suspended" | "expired";
   createdAt: string;
 };
 
@@ -188,12 +197,17 @@ export type ClubDashboard = {
     universityId: string;
     name: string;
     slug: string;
+    universityName: string;
+    acronym: string | null;
+    category: string | null;
     description: string;
     logoUrl: string | null;
+    coverImageUrl: string | null;
     officialEmail: string;
     contactEmail: string;
     websiteUrl: string | null;
     instagramUrl: string | null;
+    linkedinUrl: string | null;
     universityPageUrl: string | null;
     updatedAt: string;
     status: ClubStatus;

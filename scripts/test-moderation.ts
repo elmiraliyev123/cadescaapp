@@ -15,6 +15,7 @@ const ENV_KEYS = [
   "CLOUDFLARE_ACCOUNT_ID",
   "CLOUDFLARE_API_TOKEN",
   "CLOUDFLARE_AUTH_TOKEN",
+  "CLOUDFLARE_IMAGE_MODERATION_CLASSIFIER_MODEL",
   "CLOUDFLARE_IMAGE_MODERATION_MODEL",
   "CLOUDFLARE_IMAGE_MODERATION_REQUIRED",
   "CLOUDFLARE_IMAGE_MODERATION_TIMEOUT_MS",
@@ -146,8 +147,82 @@ async function testWorkersAiRestSafeJpeg() {
   assert.equal(request.url, `https://api.cloudflare.com/client/v4/accounts/test-account/ai/run/${WORKERS_AI_MODEL}`);
   assert.equal(typeof request.body.image, "string");
   assert.ok(String(request.body.image).startsWith("data:image/jpeg;base64,"));
-  assert.equal(request.body.prompt && typeof request.body.prompt, "string");
+  assert.ok(Array.isArray(request.body.messages));
+  assert.equal((request.body.response_format as { type?: string } | undefined)?.type, "json_schema");
   console.log("ok workers ai rest safe jpeg");
+}
+
+async function testWorkersAiStructuredObjectResponse() {
+  resetEnv();
+  process.env.CLOUDFLARE_IMAGE_MODERATION_REQUIRED = "true";
+  process.env.CLOUDFLARE_ACCOUNT_ID = "test-account";
+  process.env.CLOUDFLARE_API_TOKEN = "test-token";
+  process.env.CLOUDFLARE_IMAGE_MODERATION_MODEL = WORKERS_AI_MODEL;
+  const calls = mockWorkersAi([
+    new Response(JSON.stringify({
+      success: true,
+      result: { response: { allowed: true, reason: "safe", labels: ["safe"] } }
+    }), { status: 200 })
+  ]);
+
+  await assertImageAllowed(pngFile(), "club_logo");
+  assert.equal(calls().length, 1);
+  assert.equal((calls()[0].body.response_format as { type?: string }).type, "json_schema");
+  console.log("ok workers ai structured object response");
+}
+
+async function testWorkersAiProseUsesStructuredFallback() {
+  resetEnv();
+  process.env.CLOUDFLARE_IMAGE_MODERATION_REQUIRED = "true";
+  process.env.CLOUDFLARE_ACCOUNT_ID = "test-account";
+  process.env.CLOUDFLARE_API_TOKEN = "test-token";
+  process.env.CLOUDFLARE_IMAGE_MODERATION_MODEL = WORKERS_AI_MODEL;
+  const calls = mockWorkersAi([
+    new Response(JSON.stringify({
+      success: true,
+      result: { response: "The image contains a plain university club logo and is appropriate for students." }
+    }), { status: 200 }),
+    new Response(JSON.stringify({
+      success: true,
+      result: { response: { allowed: true, reason: "safe", labels: ["safe"] } }
+    }), { status: 200 })
+  ]);
+
+  await assertImageAllowed(pngFile(), "club_logo");
+  assert.equal(calls().length, 2);
+  assert.equal(
+    calls()[1].url,
+    "https://api.cloudflare.com/client/v4/accounts/test-account/ai/run/@cf/meta/llama-3.1-8b-instruct-fast"
+  );
+  assert.ok(!("image" in calls()[1].body));
+  assert.equal((calls()[1].body.response_format as { type?: string }).type, "json_schema");
+  assert.match(JSON.stringify(calls()[1].body.messages), /untrusted vision analysis/i);
+  console.log("ok workers ai prose structured fallback");
+}
+
+async function testWorkersAiAmbiguousFallbackFailsClosed() {
+  resetEnv();
+  process.env.CLOUDFLARE_IMAGE_MODERATION_REQUIRED = "true";
+  process.env.CLOUDFLARE_ACCOUNT_ID = "test-account";
+  process.env.CLOUDFLARE_API_TOKEN = "test-token";
+  process.env.CLOUDFLARE_IMAGE_MODERATION_MODEL = WORKERS_AI_MODEL;
+  const calls = mockWorkersAi([
+    new Response(JSON.stringify({
+      success: true,
+      result: { response: "I cannot assist with that request." }
+    }), { status: 200 }),
+    new Response(JSON.stringify({
+      success: true,
+      result: { response: "still not structured" }
+    }), { status: 200 })
+  ]);
+
+  await expectErrorMessage(
+    "workers ai ambiguous fallback",
+    () => assertImageAllowed(pngFile(), "club_logo"),
+    "image_moderation_failed"
+  );
+  assert.equal(calls().length, 2);
 }
 
 async function testWorkersAiRestLicenseRetry() {
@@ -240,6 +315,9 @@ async function main() {
     await testUnsafeImageDecision();
     await testCloudflareApiFailure();
     await testWorkersAiRestSafeJpeg();
+    await testWorkersAiStructuredObjectResponse();
+    await testWorkersAiProseUsesStructuredFallback();
+    await testWorkersAiAmbiguousFallbackFailsClosed();
     await testWorkersAiRestLicenseRetry();
     await testWorkersAiAuthFailure();
     await testLiveWorkersAiJpeg();

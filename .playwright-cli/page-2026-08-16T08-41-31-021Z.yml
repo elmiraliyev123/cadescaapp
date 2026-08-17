@@ -1,0 +1,60 @@
+- generic [active] [ref=e1]:
+  - generic [ref=e3]:
+    - banner [ref=e4]:
+      - generic [ref=e5]:
+        - button "language EN expand_more" [ref=e7] [cursor=pointer]:
+          - generic [ref=e8]: language
+          - generic [ref=e9]: EN
+          - generic [ref=e10]: expand_more
+        - img "Cadesca" [ref=e13]
+    - main [ref=e14]:
+      - generic [ref=e15]:
+        - heading "Your Campus, Connected" [level=1] [ref=e16]
+        - paragraph [ref=e17]: A simple space for students to meet, share, and grow together. Join your university's private community today.
+      - generic [ref=e18]:
+        - generic [ref=e21]:
+          - generic [ref=e22]: groups
+          - paragraph [ref=e23]: Community
+        - generic [ref=e26]:
+          - generic [ref=e27]: school
+          - paragraph [ref=e28]: Campus
+        - generic [ref=e30]:
+          - img "Cadesca" [ref=e32]
+          - generic [ref=e33]:
+            - generic [ref=e34]:
+              - generic [ref=e35]: person
+              - generic [ref=e37]:
+                - paragraph [ref=e38]: Student Feed
+                - paragraph [ref=e39]: Posts from verified students
+            - generic [ref=e40]:
+              - generic [ref=e41]: explore
+              - generic [ref=e43]:
+                - paragraph [ref=e44]: Explore
+                - paragraph [ref=e45]: Roommates, events, more
+            - generic [ref=e46]:
+              - generic [ref=e47]: qr_code_2
+              - generic [ref=e49]:
+                - paragraph [ref=e50]: Student Pass
+                - paragraph [ref=e51]: Verified digital ID
+      - generic [ref=e52]:
+        - link "Log in" [ref=e53] [cursor=pointer]:
+          - /url: https://auth.cadesca.com/login
+        - link "Create new account" [ref=e54] [cursor=pointer]:
+          - /url: https://auth.cadesca.com/signup
+        - paragraph [ref=e55]: Use your university email to join your campus.
+    - contentinfo [ref=e56]:
+      - generic [ref=e57]:
+        - img "Cadesca" [ref=e59]
+        - generic [ref=e60]:
+          - link "Privacy" [ref=e61] [cursor=pointer]:
+            - /url: /privacy
+          - link "Terms" [ref=e62] [cursor=pointer]:
+            - /url: /terms
+          - link "Safety" [ref=e63] [cursor=pointer]:
+            - /url: /safety
+          - link "Guidelines" [ref=e64] [cursor=pointer]:
+            - /url: /guidelines
+          - link "Contact" [ref=e65] [cursor=pointer]:
+            - /url: mailto:hello@cadesca.com
+        - paragraph [ref=e66]: © 2026 Cadesca. All rights reserved.
+  - alert [ref=e67]

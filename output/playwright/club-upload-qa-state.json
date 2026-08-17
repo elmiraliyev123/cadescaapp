@@ -1,0 +1,15 @@
+{
+  "cookies": [
+    {
+      "name": "cadesca_user_session",
+      "value": "eyJyb2xlIjoidXNlciIsImlkIjoicWFfY2x1Yl91cGxvYWRfMzBlNmE0NDJmNzkxNGQyMWI0YmFmNzdlZTZjMzQxOGQiLCJlbWFpbCI6InFhLWNsdWItdXBsb2FkLTMwZTZhNDQyZjc5MTRkMjFAZXhhbXBsZS5pbnZhbGlkIiwiaXNzdWVkQXQiOjE3ODY4OTk0MTIxNjMsImV4cGlyZXNBdCI6MTc4OTQ5MTQxMjE2M30.4N_wrrzD2MMRklM6PimMAvAJr6xfZYql44HCULHsBqs",
+      "domain": ".cadesca.com",
+      "path": "/",
+      "expires": 1786903012,
+      "httpOnly": true,
+      "secure": true,
+      "sameSite": "Lax"
+    }
+  ],
+  "origins": []
+}

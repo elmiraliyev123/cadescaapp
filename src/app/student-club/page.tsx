@@ -1,31 +1,19 @@
 import { redirect } from "next/navigation";
 
-import { ClubApplicationScreen } from "@/components/clubs/ClubApplicationScreen";
 import { ClubLoginScreen } from "@/components/clubs/ClubLoginScreen";
 import { getStudentClubUrl } from "@/lib/appConfig";
 import { PRIVATE_ROUTE_METADATA } from "@/lib/seo/metadata";
 import { getCurrentStudentContext } from "@/lib/server/social";
-import { getCurrentClubApplication, hasCurrentActiveClubMembership } from "@/lib/server/studentClubs";
-import { listActiveUniversities } from "@/lib/server/universities";
 
 export const metadata = {
   ...PRIVATE_ROUTE_METADATA,
-  title: "Student Club Application | Cadesca"
+  title: "Cadesca Student Clubs"
 };
 export const dynamic = "force-dynamic";
 
-export default async function StudentClubApplicationPage() {
+export default async function StudentClubLandingPage() {
   const user = await getCurrentStudentContext();
-  if (!user) {
-    return <ClubLoginScreen authHref={`${getStudentClubUrl()}/auth/start?return_to=%2Fapplication`} />;
-  }
+  if (user) redirect("/resolve");
 
-  if (await hasCurrentActiveClubMembership()) redirect("/clubs");
-
-  const application = await getCurrentClubApplication().catch(() => null);
-  if (application?.status === "approved") redirect("/dashboard");
-  if (application) redirect("/waiting-approval");
-
-  const universities = await listActiveUniversities().catch(() => []);
-  return <ClubApplicationScreen universities={universities.map(({ id, name }) => ({ id, name }))} />;
+  return <ClubLoginScreen authHref={`${getStudentClubUrl()}/auth/start?return_to=%2Fresolve`} />;
 }

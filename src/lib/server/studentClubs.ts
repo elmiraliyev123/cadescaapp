@@ -2,8 +2,17 @@ import "server-only";
 
 import { createHmac, randomUUID } from "node:crypto";
 import type { PoolClient } from "pg";
+import sharp from "sharp";
 
-import type { ClubRole } from "@/lib/clubs/permissions";
+import { rolesWithClubCapability, type ClubRole } from "@/lib/clubs/permissions";
+import {
+  ClubUploadValidationError,
+  MAX_CLUB_DOCUMENT_BYTES,
+  MAX_CLUB_IMAGE_BYTES,
+  validateClubDocumentFile,
+  validateClubImageFile,
+  type ValidatedClubUpload
+} from "@/lib/clubs/uploadValidation";
 import { assertImageAllowed } from "@/lib/server/imageModeration";
 import { hashMerchantPassword } from "@/lib/server/merchants";
 import { getCurrentStudentContext } from "@/lib/server/social";
@@ -21,21 +30,7 @@ import { validateCadescaUsername } from "@/lib/usernames";
 
 const CLUB_LOGO_BUCKET = "event-assets";
 const CLUB_DOCUMENT_BUCKET = "club-verification";
-const MAX_CLUB_LOGO_BYTES = 4 * 1024 * 1024;
-const MAX_CLUB_DOCUMENT_BYTES = 9 * 1024 * 1024;
 const CLUB_SLUG_RESERVED = new Set(["admin", "api", "app", "auth", "events", "help", "student-club", "support"]);
-const IMAGE_EXTENSIONS: Record<string, string> = {
-  "image/jpeg": "jpg",
-  "image/jpg": "jpg",
-  "image/png": "png",
-  "image/webp": "webp"
-};
-const DOCUMENT_EXTENSIONS: Record<string, string> = {
-  "application/pdf": "pdf",
-  "image/jpeg": "jpg",
-  "image/jpg": "jpg",
-  "image/png": "png"
-};
 
 export type ClubApplicationStatus =
   | "pending_review"
@@ -79,6 +74,13 @@ export type ClubApplicationView = {
   rejectedAt: string | null;
 };
 
+export type ClubApplicationHistoryEntry = {
+  id: string;
+  action: string;
+  reviewerComment: string | null;
+  createdAt: string;
+};
+
 export type AdminClubApplication = ClubApplicationView & {
   logoPreviewUrl: string | null;
   verificationDocumentUrl: string | null;
@@ -107,6 +109,7 @@ export type ManagedClubSummary = {
   universityName: string;
   logoUrl: string | null;
   roles: ClubRole[];
+  upcomingEventCount: number;
 };
 
 export type ClubApplicationInput = {
@@ -131,14 +134,58 @@ export type ClubApplicationInput = {
 };
 
 export type AuthenticatedClubApplicationInput = {
+  draftId?: string | null;
   universityId: string;
   clubName: string;
+  acronym?: string | null;
+  category?: string | null;
   officialEmail: string;
   description: string;
   logo: File;
+  cover?: File | null;
+  recognitionDocument?: File | null;
+  foundedYear?: number | null;
+  recognitionStatus?: "not_declared" | "recognized" | "not_recognized" | "pending_confirmation";
+  websiteUrl?: string | null;
+  instagramUrl?: string | null;
+  linkedinUrl?: string | null;
+  otherSocialUrl?: string | null;
+  president?: string | null;
+  vicePresident?: string | null;
+  boardMembers?: string | null;
+  facultyAdvisor?: string | null;
   contactPhone?: string | null;
   additionalNote?: string | null;
   agreementAccepted: boolean;
+};
+
+export type ClubApplicationDraftPayload = {
+  universityId: string;
+  clubName: string;
+  acronym: string;
+  category: string;
+  description: string;
+  officialEmail: string;
+  contactPhone: string;
+  websiteUrl: string;
+  instagramUrl: string;
+  linkedinUrl: string;
+  otherSocialUrl: string;
+  foundedYear: string;
+  recognitionStatus: "not_declared" | "recognized" | "not_recognized" | "pending_confirmation";
+  president: string;
+  vicePresident: string;
+  boardMembers: string;
+  facultyAdvisor: string;
+  additionalNote: string;
+};
+
+export type ClubApplicationDraftView = {
+  id: string;
+  payload: ClubApplicationDraftPayload;
+  currentStep: number;
+  createdAt: string;
+  updatedAt: string;
 };
 
 export type ClubReviewDecision = "approve" | "reject" | "request_clarification";
@@ -153,12 +200,16 @@ export type ClubApplicationUpdateInput = {
 
 export type ApprovedClubProfileInput = {
   clubId: string;
+  acronym?: string | null;
+  category?: string | null;
   description: string;
   contactEmail: string;
   websiteUrl?: string | null;
   instagramUrl?: string | null;
+  linkedinUrl?: string | null;
   universityPageUrl?: string | null;
   logo?: File | null;
+  cover?: File | null;
 };
 
 export type StudentClubErrorCode =
@@ -170,12 +221,24 @@ export type StudentClubErrorCode =
   | "club_profile_invalid"
   | "club_profile_not_editable"
   | "club_email_domain_mismatch"
+  | "document_file_too_large"
+  | "document_upload_failed"
+  | "image_file_too_large"
+  | "image_moderation_unavailable"
+  | "image_rejected"
+  | "image_upload_failed"
+  | "invalid_multipart"
   | "invalid_password"
   | "invalid_upload"
   | "invalid_username"
+  | "logo_required"
   | "reserved_username"
   | "review_conflict"
   | "review_invalid"
+  | "application_save_failed"
+  | "unsupported_document_type"
+  | "unsupported_image_type"
+  | "upload_request_too_large"
   | "upload_failed"
   | "verification_code_invalid"
   | "verification_code_expired"
@@ -231,13 +294,13 @@ type ExistingRepresentativeRow = User & {
   deleted_at?: Date | string | null;
 };
 
+type PreparedClubUpload = ValidatedClubUpload & { file: File };
+
 type ValidatedApplication = Omit<ClubApplicationInput, "confirmPassword" | "logo" | "recognitionDocument"> & {
   university: UniversityRecord;
   clubSlug: string;
-  logo: File;
-  logoExtension: string;
-  recognitionDocument: File;
-  documentExtension: string;
+  logoUpload: PreparedClubUpload;
+  documentUpload: PreparedClubUpload;
   instagramUrl: string;
   websiteUrl: string;
   universityPageUrl: string | null;
@@ -371,57 +434,77 @@ export async function validateClubOtpRecipient(input: {
   return { university, representativeEmail, officialEmail };
 }
 
-async function magicBytes(file: File) {
-  return new Uint8Array(await file.slice(0, 16).arrayBuffer());
+function mapUploadValidationError(error: unknown, kind: "image" | "document"): never {
+  if (error instanceof ClubUploadValidationError) {
+    if (error.code === "image_file_too_large" || error.code === "document_file_too_large") {
+      throw new StudentClubError(error.code, 413);
+    }
+    if (error.code === "unsupported_document_type") throw new StudentClubError(error.code, 415);
+    throw new StudentClubError(kind === "document" ? "unsupported_document_type" : "unsupported_image_type", 415);
+  }
+  throw error;
 }
 
-function bytesAreJpeg(bytes: Uint8Array) {
-  return bytes.length >= 3 && bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff;
+async function normalizeHeifUpload(file: File, maximumBytes: number, kind: "image" | "document") {
+  try {
+    const source = new Uint8Array(await file.arrayBuffer());
+    const encoded = await sharp(source, { limitInputPixels: 40_000_000 })
+      .rotate()
+      .resize({ width: kind === "document" ? 3200 : 2400, height: kind === "document" ? 3200 : 2400, fit: "inside", withoutEnlargement: true })
+      .flatten({ background: "#ffffff" })
+      .jpeg({ quality: kind === "document" ? 90 : 88, mozjpeg: true })
+      .toBuffer();
+    if (!encoded.length || encoded.length > maximumBytes) {
+      throw new StudentClubError(kind === "document" ? "document_file_too_large" : "image_file_too_large", 413);
+    }
+    return new File([new Uint8Array(encoded)], "normalized-upload.jpg", {
+      type: "image/jpeg",
+      lastModified: file.lastModified
+    });
+  } catch (error) {
+    if (error instanceof StudentClubError) throw error;
+    console.warn("[student_clubs] heif_normalization_failed", {
+      kind,
+      byteSize: file.size,
+      declaredType: file.type || "unspecified",
+      reason: error instanceof Error ? error.name : "unknown"
+    });
+    throw new StudentClubError(kind === "document" ? "unsupported_document_type" : "unsupported_image_type", 415);
+  }
 }
 
-function bytesArePng(bytes: Uint8Array) {
-  return bytes.length >= 8 && bytes[0] === 0x89 && bytes[1] === 0x50 && bytes[2] === 0x4e && bytes[3] === 0x47;
-}
-
-function bytesAreWebp(bytes: Uint8Array) {
-  return bytes.length >= 12 &&
-    Buffer.from(bytes.subarray(0, 4)).toString("ascii") === "RIFF" &&
-    Buffer.from(bytes.subarray(8, 12)).toString("ascii") === "WEBP";
-}
-
-function bytesArePdf(bytes: Uint8Array) {
-  return bytes.length >= 5 && Buffer.from(bytes.subarray(0, 5)).toString("ascii") === "%PDF-";
-}
-
-async function validateLogo(file: File) {
-  if (!file.size || file.size > MAX_CLUB_LOGO_BYTES) throw new StudentClubError("invalid_upload", 422);
-  const contentType = file.type.toLowerCase();
-  const extension = IMAGE_EXTENSIONS[contentType];
-  if (!extension) throw new StudentClubError("invalid_upload", 415);
-  const bytes = await magicBytes(file);
-  const valid = extension === "jpg" ? bytesAreJpeg(bytes) : extension === "png" ? bytesArePng(bytes) : bytesAreWebp(bytes);
-  if (!valid) throw new StudentClubError("invalid_upload", 415);
-  return extension;
+async function prepareClubImage(file: File): Promise<PreparedClubUpload> {
+  let validated: ValidatedClubUpload;
+  try {
+    validated = await validateClubImageFile(file);
+  } catch (error) {
+    return mapUploadValidationError(error, "image");
+  }
+  if (!validated.isHeif) return { ...validated, file };
+  const normalized = await normalizeHeifUpload(file, MAX_CLUB_IMAGE_BYTES, "image");
+  return { file: normalized, extension: "jpg", contentType: "image/jpeg", isHeif: false };
 }
 
 async function moderateClubLogo(file: File) {
   await assertImageAllowed(file, "club_logo").catch((error) => {
-    if (error instanceof Error && (error.message === "image_rejected" || error.message === "image_moderation_invalid_input")) {
-      throw new StudentClubError("invalid_upload", 422);
+    if (error instanceof Error && error.message === "image_rejected") throw new StudentClubError("image_rejected", 422);
+    if (error instanceof Error && error.message === "image_moderation_invalid_input") {
+      throw new StudentClubError("unsupported_image_type", 415);
     }
-    throw new StudentClubError("invalid_upload", 503);
+    throw new StudentClubError("image_moderation_unavailable", 503);
   });
 }
 
-async function validateRecognitionDocument(file: File) {
-  if (!file.size || file.size > MAX_CLUB_DOCUMENT_BYTES) throw new StudentClubError("invalid_upload", 422);
-  const contentType = file.type.toLowerCase();
-  const extension = DOCUMENT_EXTENSIONS[contentType];
-  if (!extension) throw new StudentClubError("invalid_upload", 415);
-  const bytes = await magicBytes(file);
-  const valid = extension === "pdf" ? bytesArePdf(bytes) : extension === "jpg" ? bytesAreJpeg(bytes) : bytesArePng(bytes);
-  if (!valid) throw new StudentClubError("invalid_upload", 415);
-  return extension;
+async function prepareClubDocument(file: File): Promise<PreparedClubUpload> {
+  let validated: ValidatedClubUpload;
+  try {
+    validated = await validateClubDocumentFile(file);
+  } catch (error) {
+    return mapUploadValidationError(error, "document");
+  }
+  if (!validated.isHeif) return { ...validated, file };
+  const normalized = await normalizeHeifUpload(file, MAX_CLUB_DOCUMENT_BYTES, "document");
+  return { file: normalized, extension: "jpg", contentType: "image/jpeg", isHeif: false };
 }
 
 async function validateApplication(input: ClubApplicationInput): Promise<ValidatedApplication> {
@@ -466,9 +549,9 @@ async function validateApplication(input: ClubApplicationInput): Promise<Validat
     throw new StudentClubError("application_invalid", 422);
   }
 
-  const [logoExtension, documentExtension] = await Promise.all([
-    validateLogo(input.logo),
-    validateRecognitionDocument(input.recognitionDocument)
+  const [logoUpload, documentUpload] = await Promise.all([
+    prepareClubImage(input.logo),
+    prepareClubDocument(input.recognitionDocument)
   ]);
 
   return {
@@ -481,8 +564,8 @@ async function validateApplication(input: ClubApplicationInput): Promise<Validat
     representativeEmail: emailValidation.representativeEmail,
     representativeUsername,
     description,
-    logoExtension,
-    documentExtension,
+    logoUpload,
+    documentUpload,
     instagramUrl,
     websiteUrl,
     universityPageUrl,
@@ -514,11 +597,15 @@ function validateEditableApplication(input: ClubApplicationUpdateInput) {
 
 export function validateApprovedClubProfile(input: ApprovedClubProfileInput) {
   const clubId = input.clubId.trim();
+  const acronym = input.acronym?.trim() || null;
+  const category = input.category?.trim() || null;
   const description = input.description.trim();
   const contactEmail = normalizeEmail(input.contactEmail);
 
   if (
     !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(clubId) ||
+    (acronym !== null && !fieldLength(acronym, 2, 20)) ||
+    (category !== null && !fieldLength(category, 2, 80)) ||
     !fieldLength(description, 20, 4_000) ||
     contactEmail.length > 254 ||
     !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(contactEmail)
@@ -529,9 +616,10 @@ export function validateApprovedClubProfile(input: ApprovedClubProfileInput) {
   try {
     const websiteUrl = normalizeHttpUrl(input.websiteUrl || "", false);
     const instagramUrl = normalizeHttpUrl(input.instagramUrl || "", false);
+    const linkedinUrl = normalizeHttpUrl(input.linkedinUrl || "", false);
     const universityPageUrl = normalizeHttpUrl(input.universityPageUrl || "", false);
 
-    if ([websiteUrl, instagramUrl, universityPageUrl].some((value) => value && value.length > 2_048)) {
+    if ([websiteUrl, instagramUrl, linkedinUrl, universityPageUrl].some((value) => value && value.length > 2_048)) {
       throw new StudentClubError("club_profile_invalid", 422);
     }
     if (instagramUrl) {
@@ -541,7 +629,14 @@ export function validateApprovedClubProfile(input: ApprovedClubProfileInput) {
       }
     }
 
-    return { clubId, description, contactEmail, websiteUrl, instagramUrl, universityPageUrl };
+    if (linkedinUrl) {
+      const linkedinHost = new URL(linkedinUrl).hostname.toLowerCase();
+      if (linkedinHost !== "linkedin.com" && !linkedinHost.endsWith(".linkedin.com")) {
+        throw new StudentClubError("club_profile_invalid", 422);
+      }
+    }
+
+    return { clubId, acronym, category, description, contactEmail, websiteUrl, instagramUrl, linkedinUrl, universityPageUrl };
   } catch (error) {
     if (error instanceof StudentClubError && error.code === "club_profile_invalid") throw error;
     throw new StudentClubError("club_profile_invalid", 422);
@@ -598,35 +693,48 @@ async function authenticateExistingRepresentative(user: ExistingRepresentativeRo
 }
 
 async function uploadApplicationFiles(application: ValidatedApplication, clubId: string) {
-  const logoPath = `clubs/${clubId}/logo/${randomUUID()}.${application.logoExtension}`;
-  const documentPath = `clubs/${clubId}/verification/${randomUUID()}.${application.documentExtension}`;
+  const logoPath = `clubs/${clubId}/logo/${randomUUID()}.${application.logoUpload.extension}`;
+  const documentPath = `clubs/${clubId}/verification/${randomUUID()}.${application.documentUpload.extension}`;
   const storage = getSupabaseAdminClient().storage;
   let logoUploaded = false;
 
   try {
-    const { error: logoError } = await storage.from(CLUB_LOGO_BUCKET).upload(logoPath, application.logo, {
+    const { error: logoError } = await storage.from(CLUB_LOGO_BUCKET).upload(logoPath, application.logoUpload.file, {
       cacheControl: "31536000",
-      contentType: application.logoExtension === "jpg" ? "image/jpeg" : `image/${application.logoExtension}`,
+      contentType: application.logoUpload.contentType,
       upsert: false
     });
-    if (logoError) throw logoError;
+    if (logoError) {
+      console.error("[student_clubs] storage_upload_failed", {
+        kind: "image",
+        bucket: CLUB_LOGO_BUCKET,
+        statusCode: "statusCode" in logoError ? logoError.statusCode : undefined,
+        reason: logoError.name
+      });
+      throw new StudentClubError("image_upload_failed", 502);
+    }
     logoUploaded = true;
 
-    const { error: documentError } = await storage.from(CLUB_DOCUMENT_BUCKET).upload(documentPath, application.recognitionDocument, {
+    const { error: documentError } = await storage.from(CLUB_DOCUMENT_BUCKET).upload(documentPath, application.documentUpload.file, {
       cacheControl: "0",
-      contentType: application.documentExtension === "pdf"
-        ? "application/pdf"
-        : application.documentExtension === "jpg"
-          ? "image/jpeg"
-          : "image/png",
+      contentType: application.documentUpload.contentType,
       upsert: false
     });
-    if (documentError) throw documentError;
+    if (documentError) {
+      console.error("[student_clubs] storage_upload_failed", {
+        kind: "document",
+        bucket: CLUB_DOCUMENT_BUCKET,
+        statusCode: "statusCode" in documentError ? documentError.statusCode : undefined,
+        reason: documentError.name
+      });
+      throw new StudentClubError("document_upload_failed", 502);
+    }
 
     return { logoPath, documentPath };
-  } catch {
+  } catch (error) {
     if (logoUploaded) await storage.from(CLUB_LOGO_BUCKET).remove([logoPath]).catch(() => undefined);
     await storage.from(CLUB_DOCUMENT_BUCKET).remove([documentPath]).catch(() => undefined);
+    if (error instanceof StudentClubError) throw error;
     throw new StudentClubError("upload_failed", 502);
   }
 }
@@ -881,7 +989,7 @@ export async function submitClubApplication(input: ClubApplicationInput & { otp:
     throw new StudentClubError("invalid_password", 422);
   }
   if (existingUser) await authenticateExistingRepresentative(existingUser, application.password);
-  await moderateClubLogo(application.logo);
+  await moderateClubLogo(application.logoUpload.file);
 
   const clubId = randomUUID();
   const paths = await uploadApplicationFiles(application, clubId);
@@ -926,6 +1034,163 @@ export async function submitClubApplication(input: ClubApplicationInput & { otp:
   }
 }
 
+const EMPTY_APPLICATION_DRAFT: ClubApplicationDraftPayload = {
+  universityId: "",
+  clubName: "",
+  acronym: "",
+  category: "",
+  description: "",
+  officialEmail: "",
+  contactPhone: "",
+  websiteUrl: "",
+  instagramUrl: "",
+  linkedinUrl: "",
+  otherSocialUrl: "",
+  foundedYear: "",
+  recognitionStatus: "not_declared",
+  president: "",
+  vicePresident: "",
+  boardMembers: "",
+  facultyAdvisor: "",
+  additionalNote: ""
+};
+
+function sanitizeDraftPayload(value: Partial<ClubApplicationDraftPayload>): ClubApplicationDraftPayload {
+  const limits: Record<Exclude<keyof ClubApplicationDraftPayload, "recognitionStatus">, number> = {
+    universityId: 36,
+    clubName: 140,
+    acronym: 20,
+    category: 80,
+    description: 4_000,
+    officialEmail: 254,
+    contactPhone: 40,
+    websiteUrl: 2_048,
+    instagramUrl: 2_048,
+    linkedinUrl: 2_048,
+    otherSocialUrl: 2_048,
+    foundedYear: 4,
+    president: 120,
+    vicePresident: 120,
+    boardMembers: 2_000,
+    facultyAdvisor: 160,
+    additionalNote: 2_000
+  };
+  const result = { ...EMPTY_APPLICATION_DRAFT };
+  for (const key of Object.keys(limits) as Array<keyof typeof limits>) {
+    const next = typeof value[key] === "string" ? value[key]!.trim() : "";
+    if (next.length > limits[key]) throw new StudentClubError("application_invalid", 422);
+    result[key] = next;
+  }
+  const status = value.recognitionStatus;
+  if (status && ["not_declared", "recognized", "not_recognized", "pending_confirmation"].includes(status)) {
+    result.recognitionStatus = status;
+  }
+  return result;
+}
+
+function mapApplicationDraft(row: {
+  id: string;
+  payload: Partial<ClubApplicationDraftPayload>;
+  current_step: number;
+  created_at: Date | string;
+  updated_at: Date | string;
+}): ClubApplicationDraftView {
+  return {
+    id: row.id,
+    payload: sanitizeDraftPayload(row.payload || {}),
+    currentStep: Math.min(5, Math.max(1, Number(row.current_step) || 1)),
+    createdAt: toIso(row.created_at) || "",
+    updatedAt: toIso(row.updated_at) || ""
+  };
+}
+
+export async function getCurrentClubApplicationDraft(): Promise<ClubApplicationDraftView | null> {
+  const user = await getCurrentStudentContext();
+  if (!user || user.status !== "active" || user.id === "user_mock") return null;
+  const pool = await getReadyPool();
+  const result = await pool.query<{
+    id: string;
+    payload: Partial<ClubApplicationDraftPayload>;
+    current_step: number;
+    created_at: Date | string;
+    updated_at: Date | string;
+  }>(
+    `select id, payload, current_step, created_at, updated_at
+       from public.club_application_drafts
+      where applicant_user_id = $1 and status = 'active'
+      order by updated_at desc
+      limit 1`,
+    [user.id]
+  );
+  return result.rows[0] ? mapApplicationDraft(result.rows[0]) : null;
+}
+
+export async function getCurrentClubApplicationDraftById(id: string): Promise<ClubApplicationDraftView | null> {
+  if (!/^[0-9a-f-]{36}$/i.test(id)) return null;
+  const draft = await getCurrentClubApplicationDraft();
+  return draft?.id === id ? draft : null;
+}
+
+export async function saveCurrentClubApplicationDraft(input: {
+  id?: string | null;
+  currentStep: number;
+  payload: Partial<ClubApplicationDraftPayload>;
+}) {
+  const user = await getCurrentStudentContext();
+  if (!user || user.status !== "active" || user.id === "user_mock") {
+    throw new StudentClubError("authentication_required", 401);
+  }
+  const payload = sanitizeDraftPayload(input.payload);
+  const currentStep = Math.min(5, Math.max(1, Math.trunc(input.currentStep || 1)));
+  const university = payload.universityId ? await activeUniversityById(payload.universityId) : null;
+  if (payload.universityId && !university) throw new StudentClubError("application_invalid", 422);
+
+  const pool = await getReadyPool();
+  const client = await pool.connect();
+  try {
+    await client.query("begin");
+    await client.query(`select pg_advisory_xact_lock(hashtextextended($1, 0))`, [user.id]);
+    const existingApplication = await client.query<{ exists: boolean }>(
+      `select exists (
+         select 1
+           from public.club_memberships membership
+           join public.student_clubs club on club.id = membership.club_id
+          where membership.user_id = $1
+            and membership.role = 'club_owner'
+            and club.status in ('pending_review', 'clarification_requested')
+       ) as exists`,
+      [user.id]
+    );
+    if (existingApplication.rows[0]?.exists) throw new StudentClubError("application_conflict", 409);
+
+    const result = await client.query<{
+      id: string;
+      payload: Partial<ClubApplicationDraftPayload>;
+      current_step: number;
+      created_at: Date | string;
+      updated_at: Date | string;
+    }>(
+      `insert into public.club_application_drafts (
+         id, applicant_user_id, university_id, payload, current_step, status, created_at, updated_at
+       ) values (coalesce($1::uuid, gen_random_uuid()), $2, $3::uuid, $4::jsonb, $5, 'active', now(), now())
+       on conflict (applicant_user_id) where status = 'active'
+       do update set university_id = excluded.university_id,
+                     payload = excluded.payload,
+                     current_step = excluded.current_step,
+                     updated_at = now()
+       returning id, payload, current_step, created_at, updated_at`,
+      [input.id || null, user.id, university?.id || null, JSON.stringify(payload), currentStep]
+    );
+    await client.query("commit");
+    return mapApplicationDraft(result.rows[0]);
+  } catch (error) {
+    await client.query("rollback").catch(() => undefined);
+    throw error;
+  } finally {
+    client.release();
+  }
+}
+
 /**
  * Creates a pending application for the Cadesca user already authenticated on
  * the shared Cadesca session. Student Club never creates or signs in a second
@@ -941,36 +1206,124 @@ export async function submitAuthenticatedClubApplication(input: AuthenticatedClu
   const clubName = input.clubName.trim();
   const description = input.description.trim();
   const officialEmail = normalizeEmail(input.officialEmail);
+  const acronym = input.acronym?.trim() || null;
+  const category = input.category?.trim() || null;
   const contactPhone = input.contactPhone?.trim() || null;
   const additionalNote = input.additionalNote?.trim() || null;
   const clubSlug = normalizeClubSlug(clubName);
+  const foundedYear = input.foundedYear || null;
+  const recognitionStatus = input.recognitionStatus || "not_declared";
+
+  let websiteUrl: string | null;
+  let instagramUrl: string | null;
+  let linkedinUrl: string | null;
+  let otherSocialUrl: string | null;
+  try {
+    websiteUrl = normalizeHttpUrl(input.websiteUrl || "", false);
+    instagramUrl = normalizeHttpUrl(input.instagramUrl || "", false);
+    linkedinUrl = normalizeHttpUrl(input.linkedinUrl || "", false);
+    otherSocialUrl = normalizeHttpUrl(input.otherSocialUrl || "", false);
+  } catch {
+    throw new StudentClubError("application_invalid", 422);
+  }
+
+  const leadership = [
+    { role: "president", name: input.president?.trim() || "" },
+    { role: "vice_president", name: input.vicePresident?.trim() || "" },
+    { role: "board_members", name: input.boardMembers?.trim() || "" },
+    { role: "faculty_advisor", name: input.facultyAdvisor?.trim() || "" }
+  ].filter((entry) => entry.name);
 
   if (
     !university ||
+    (representative.universityId && representative.universityId !== university.id) ||
     !input.agreementAccepted ||
     !fieldLength(clubName, 2, 140) ||
-    !fieldLength(description, 20, 2_000) ||
+    !fieldLength(description, 20, 4_000) ||
+    (acronym !== null && !fieldLength(acronym, 2, 20)) ||
+    (category !== null && !fieldLength(category, 2, 80)) ||
     clubSlug.length < 3 ||
     CLUB_SLUG_RESERVED.has(clubSlug) ||
     !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(officialEmail) ||
+    (foundedYear !== null && (foundedYear < 1800 || foundedYear > new Date().getFullYear())) ||
+    !["not_declared", "recognized", "not_recognized", "pending_confirmation"].includes(recognitionStatus) ||
     (contactPhone !== null && !/^[+0-9() .-]{6,40}$/.test(contactPhone)) ||
-    (additionalNote !== null && additionalNote.length > 1_000)
+    (additionalNote !== null && additionalNote.length > 2_000) ||
+    leadership.some((entry) => entry.name.length > (entry.role === "board_members" ? 2_000 : 160))
   ) {
     throw new StudentClubError("application_invalid", 422);
   }
 
-  const logoExtension = await validateLogo(input.logo);
-  await moderateClubLogo(input.logo);
+  const [logoUpload, coverUpload, documentUpload] = await Promise.all([
+    prepareClubImage(input.logo),
+    input.cover ? prepareClubImage(input.cover) : Promise.resolve(null),
+    input.recognitionDocument ? prepareClubDocument(input.recognitionDocument) : Promise.resolve(null)
+  ]);
+  await Promise.all([
+    moderateClubLogo(logoUpload.file),
+    coverUpload ? moderateClubLogo(coverUpload.file) : Promise.resolve()
+  ]);
 
   const clubId = randomUUID();
-  const logoPath = `clubs/${clubId}/logo/${randomUUID()}.${logoExtension}`;
+  const logoPath = `clubs/${clubId}/logo/${randomUUID()}.${logoUpload.extension}`;
+  const coverPath = coverUpload ? `clubs/${clubId}/cover/${randomUUID()}.${coverUpload.extension}` : null;
+  const documentPath = documentUpload ? `clubs/${clubId}/verification/${randomUUID()}.${documentUpload.extension}` : null;
   const storage = getSupabaseAdminClient().storage;
-  const { error: uploadError } = await storage.from(CLUB_LOGO_BUCKET).upload(logoPath, input.logo, {
-    cacheControl: "31536000",
-    contentType: logoExtension === "jpg" ? "image/jpeg" : `image/${logoExtension}`,
-    upsert: false
-  });
-  if (uploadError) throw new StudentClubError("upload_failed", 502);
+  const uploaded: Array<{ bucket: string; path: string }> = [];
+  const upload = async (
+    kind: "image" | "document",
+    bucket: string,
+    path: string,
+    prepared: PreparedClubUpload,
+    cacheControl: string
+  ) => {
+    const { error } = await storage.from(bucket).upload(path, prepared.file, {
+      cacheControl,
+      contentType: prepared.contentType,
+      upsert: false
+    });
+    if (error) {
+      console.error("[student_clubs] storage_upload_failed", {
+        kind,
+        bucket,
+        statusCode: "statusCode" in error ? error.statusCode : undefined,
+        reason: error.name
+      });
+      throw new StudentClubError(kind === "document" ? "document_upload_failed" : "image_upload_failed", 502);
+    }
+    uploaded.push({ bucket, path });
+  };
+
+  try {
+    await upload(
+      "image",
+      CLUB_LOGO_BUCKET,
+      logoPath,
+      logoUpload,
+      "31536000"
+    );
+    if (coverPath && coverUpload) {
+      await upload(
+        "image",
+        CLUB_LOGO_BUCKET,
+        coverPath,
+        coverUpload,
+        "31536000"
+      );
+    }
+    if (documentPath && documentUpload) {
+      await upload(
+        "document",
+        CLUB_DOCUMENT_BUCKET,
+        documentPath,
+        documentUpload,
+        "0"
+      );
+    }
+  } catch (error) {
+    await Promise.all(uploaded.map((asset) => storage.from(asset.bucket).remove([asset.path]).catch(() => undefined)));
+    throw error;
+  }
 
   try {
     const pool = await getReadyPool();
@@ -979,15 +1332,18 @@ export async function submitAuthenticatedClubApplication(input: AuthenticatedClu
       await client.query("BEGIN");
       await client.query(`SELECT pg_advisory_xact_lock(hashtextextended($1, 0))`, [representative.id]);
 
+      const duplicateStatuses = process.env.STUDENT_CLUB_ALLOW_MULTIPLE_APPLICATIONS === "true"
+        ? ["pending_review", "clarification_requested", "suspended"]
+        : ["pending_review", "clarification_requested", "approved", "suspended"];
       const duplicate = await client.query<{ exists: boolean }>(
         `SELECT EXISTS (
            SELECT 1
              FROM public.club_memberships membership
              JOIN public.student_clubs club ON club.id = membership.club_id
             WHERE membership.user_id = $1
-              AND club.status IN ('pending_review', 'clarification_requested', 'approved', 'suspended')
+              AND club.status = any($2::text[])
          ) AS exists`,
-        [representative.id]
+        [representative.id, duplicateStatuses]
       );
       if (duplicate.rows[0]?.exists) throw new StudentClubError("application_conflict", 409);
 
@@ -996,12 +1352,15 @@ export async function submitAuthenticatedClubApplication(input: AuthenticatedClu
            id, university_id, name, slug, description, logo_url,
            official_email, contact_email, website_url, instagram_url,
            university_page_url, verification_document_url, contact_phone,
-           additional_note, status, created_at, updated_at
+           additional_note, status, acronym, category, cover_image_url,
+           founded_year, official_recognition_status, social_links, leadership,
+           application_submitted_at, created_at, updated_at
          )
          VALUES (
            $1::uuid, $2::uuid, $3, $4, $5, $6,
-           $7, $8, NULL, NULL, NULL, '', $9, $10,
-           'pending_review', now(), now()
+           $7, $8, $9, $10, NULL, $11, $12, $13,
+           'pending_review', $14, $15, $16, $17, $18, $19::jsonb, $20::jsonb,
+           now(), now(), now()
          )`,
         [
           clubId,
@@ -1012,8 +1371,18 @@ export async function submitAuthenticatedClubApplication(input: AuthenticatedClu
           logoPath,
           officialEmail,
           normalizeEmail(representative.email),
+          websiteUrl,
+          instagramUrl,
+          documentPath,
           contactPhone,
-          additionalNote
+          additionalNote,
+          acronym,
+          category,
+          coverPath,
+          foundedYear,
+          recognitionStatus,
+          JSON.stringify({ linkedin: linkedinUrl, other: otherSocialUrl }),
+          JSON.stringify(leadership)
         ]
       );
 
@@ -1031,6 +1400,47 @@ export async function submitAuthenticatedClubApplication(input: AuthenticatedClu
         [university.id, clubId, representative.id, JSON.stringify({ rulesAccepted: true, authentication: "cadesca" })]
       );
 
+      await client.query(
+        `insert into public.club_application_history (
+           club_id, actor_user_id, action, snapshot, created_at
+         ) values ($1::uuid, $2, 'submitted', $3::jsonb, now())`,
+        [clubId, representative.id, JSON.stringify({ clubName, acronym, category, universityId: university.id })]
+      );
+
+      await client.query(
+        `insert into public.club_audit_logs (
+           club_id, actor_user_id, action, entity_type, entity_id, after_data, metadata, created_at
+         ) values ($1::uuid, $2, 'club_application_submitted', 'club_application', $1::text, $3::jsonb, $4::jsonb, now())`,
+        [
+          clubId,
+          representative.id,
+          JSON.stringify({ status: "pending_review", clubName }),
+          JSON.stringify({ rulesAccepted: true, authentication: "cadesca" })
+        ]
+      );
+
+      const mediaAssets = [
+        { path: logoPath, kind: "logo", upload: logoUpload },
+        ...(coverPath && coverUpload ? [{ path: coverPath, kind: "cover", upload: coverUpload }] : [])
+      ];
+      for (const asset of mediaAssets) {
+        await client.query(
+          `insert into public.club_media_assets (
+             club_id, uploaded_by, object_path, media_kind, mime_type, byte_size, created_at
+           ) values ($1::uuid, $2, $3, $4, $5, $6, now())`,
+          [clubId, representative.id, asset.path, asset.kind, asset.upload.contentType, asset.upload.file.size]
+        );
+      }
+
+      if (input.draftId) {
+        await client.query(
+          `update public.club_application_drafts
+              set status = 'submitted', submitted_club_id = $1::uuid, submitted_at = now(), updated_at = now()
+            where id = $2::uuid and applicant_user_id = $3 and status = 'active'`,
+          [clubId, input.draftId, representative.id]
+        );
+      }
+
       await client.query("COMMIT");
       return { clubId, status: "pending_review" as const };
     } catch (error) {
@@ -1040,7 +1450,7 @@ export async function submitAuthenticatedClubApplication(input: AuthenticatedClu
       client.release();
     }
   } catch (error) {
-    await storage.from(CLUB_LOGO_BUCKET).remove([logoPath]).catch(() => undefined);
+    await Promise.all(uploaded.map((asset) => storage.from(asset.bucket).remove([asset.path]).catch(() => undefined)));
     if (error instanceof StudentClubError) throw error;
     const pgCode = typeof error === "object" && error !== null && "code" in error ? String(error.code) : "";
     if (pgCode === "23505") throw new StudentClubError("application_conflict", 409);
@@ -1048,7 +1458,7 @@ export async function submitAuthenticatedClubApplication(input: AuthenticatedClu
       reason: error instanceof Error ? error.name : "unknown",
       code: pgCode || undefined
     });
-    throw new StudentClubError("application_invalid", 500);
+    throw new StudentClubError("application_save_failed", 500);
   }
 }
 
@@ -1161,6 +1571,36 @@ export async function getCurrentClubApplication(): Promise<ClubApplicationView |
   return result.rows[0] ? mapApplication(result.rows[0]) : null;
 }
 
+export async function getCurrentClubApplicationHistory(clubId: string): Promise<ClubApplicationHistoryEntry[]> {
+  const user = await getCurrentStudentContext();
+  if (!user || user.status !== "active" || !/^[0-9a-f-]{36}$/i.test(clubId)) return [];
+  const pool = await getReadyPool();
+  const result = await pool.query<{
+    id: string;
+    action: string;
+    reviewer_comment: string | null;
+    created_at: Date | string;
+  }>(
+    `select history.id, history.action, history.reviewer_comment, history.created_at
+       from public.club_application_history history
+      where history.club_id = $1::uuid
+        and exists (
+          select 1 from public.club_memberships membership
+           where membership.club_id = history.club_id
+             and membership.user_id = $2
+             and membership.role = 'club_owner'
+        )
+      order by history.created_at asc`,
+    [clubId, user.id]
+  );
+  return result.rows.map((row) => ({
+    id: row.id,
+    action: row.action,
+    reviewerComment: row.reviewer_comment,
+    createdAt: toIso(row.created_at) || ""
+  }));
+}
+
 export async function listCurrentClubMembershipInvitations(): Promise<ClubMembershipInvitation[]> {
   const user = await getCurrentStudentContext();
   if (!user || user.status !== "active" || user.id === "user_mock") return [];
@@ -1186,6 +1626,7 @@ export async function listCurrentClubMembershipInvitations(): Promise<ClubMember
        JOIN public.universities university ON university.id = club.university_id
       WHERE membership.user_id = $1
         AND membership.status = 'invited'
+        AND membership.invitation_expires_at > now()
       ORDER BY membership.invited_at DESC NULLS LAST, membership.created_at DESC`,
     [user.id]
   );
@@ -1229,16 +1670,23 @@ export async function listCurrentManagedClubs(): Promise<ManagedClubSummary[]> {
     university_name: string;
     logo_url: string | null;
     roles: ClubRole[];
+    upcoming_event_count: number;
   }>(
     `SELECT club.id,
             club.name,
             club.slug,
             university.name AS university_name,
             club.logo_url,
-            array_agg(membership.role ORDER BY membership.role)::text[] AS roles
+            array_agg(distinct membership.role ORDER BY membership.role)::text[] AS roles,
+            count(distinct event.id) filter (
+              where event.status in ('published', 'sold_out')
+                and event.moderation_status = 'active'
+                and event.start_at >= now()
+            )::int as upcoming_event_count
        FROM public.student_clubs club
        JOIN public.club_memberships membership ON membership.club_id = club.id
        JOIN public.universities university ON university.id = club.university_id
+       left join public.events event on event.club_id = club.id
       WHERE membership.user_id = $1
         AND membership.status = 'active'
         AND club.status = 'approved'
@@ -1252,8 +1700,55 @@ export async function listCurrentManagedClubs(): Promise<ManagedClubSummary[]> {
     slug: club.slug,
     universityName: club.university_name,
     logoUrl: club.logo_url ? `/media/club/${encodeURIComponent(club.id)}` : null,
-    roles: club.roles
+    roles: club.roles,
+    upcomingEventCount: Number(club.upcoming_event_count || 0)
   }));
+}
+
+function requestedPortalDestination(
+  requested: string | undefined,
+  clubs: ManagedClubSummary[],
+  application: ClubApplicationView | null,
+  draft: ClubApplicationDraftView | null
+) {
+  if (!requested) return null;
+  if (requested === "/clubs" && clubs.length) return requested;
+  if (requested === "/application" && !application) return requested;
+  if (draft && requested === `/application/${draft.id}`) return requested;
+  if (
+    application &&
+    (requested === `/application/${application.id}` || requested === `/application/${application.id}/status`)
+  ) {
+    return requested;
+  }
+
+  const dashboard = requested.match(/^\/dashboard\/([a-z0-9](?:[a-z0-9-]{1,90}[a-z0-9])?)(?:\/.*)?$/i);
+  if (dashboard && clubs.some((club) => club.slug === dashboard[1])) return requested;
+  return null;
+}
+
+/**
+ * Single post-authentication router for the Student Club client. It derives
+ * destinations from trusted membership/application records and never accepts
+ * an arbitrary external return URL.
+ */
+export async function resolveStudentClubDestination(requested?: string) {
+  const user = await getCurrentStudentContext();
+  if (!user || user.status !== "active") return "/";
+
+  const [clubs, application, draft] = await Promise.all([
+    listCurrentManagedClubs(),
+    getCurrentClubApplication().catch(() => null),
+    getCurrentClubApplicationDraft().catch(() => null)
+  ]);
+  const safeRequested = requestedPortalDestination(requested, clubs, application, draft);
+  if (safeRequested) return safeRequested;
+
+  if (clubs.length === 1) return `/dashboard/${encodeURIComponent(clubs[0].slug)}`;
+  if (clubs.length > 1) return "/clubs";
+  if (application) return `/application/${encodeURIComponent(application.id)}/status`;
+  if (draft) return `/application/${encodeURIComponent(draft.id)}`;
+  return "/application";
 }
 
 export async function getUserClubAccessSummary(userId: string): Promise<UserClubAccessSummary> {
@@ -1359,7 +1854,7 @@ type PendingOwnerApplication = {
   university_id: string;
   logo_url: string | null;
   verification_document_url: string;
-  status: "pending_review" | "clarification_requested";
+  status: "pending_review" | "clarification_requested" | "rejected";
   user_id: string;
   updated_at: Date | string;
 };
@@ -1384,7 +1879,7 @@ async function requirePendingOwnerApplication() {
         AND membership.user_id = $1
         AND membership.role = 'club_owner'
         AND membership.status = 'invited'
-      WHERE club.status IN ('pending_review', 'clarification_requested')
+      WHERE club.status IN ('pending_review', 'clarification_requested', 'rejected')
       ORDER BY club.created_at DESC
       LIMIT 1`,
     [user.id]
@@ -1398,20 +1893,49 @@ function safeClubStoragePath(clubId: string, path: string | null | undefined) {
 }
 
 async function uploadClubLogoObject(clubId: string, logo: File) {
-  const extension = await validateLogo(logo);
-  await moderateClubLogo(logo);
-  const logoPath = `clubs/${clubId}/logo/${randomUUID()}.${extension}`;
+  const prepared = await prepareClubImage(logo);
+  await moderateClubLogo(prepared.file);
+  const logoPath = `clubs/${clubId}/logo/${randomUUID()}.${prepared.extension}`;
   const storage = getSupabaseAdminClient().storage;
-  const { error } = await storage.from(CLUB_LOGO_BUCKET).upload(logoPath, logo, {
+  const { error } = await storage.from(CLUB_LOGO_BUCKET).upload(logoPath, prepared.file, {
     cacheControl: "31536000",
-    contentType: extension === "jpg" ? "image/jpeg" : `image/${extension}`,
+    contentType: prepared.contentType,
     upsert: false
   });
   if (error) {
+    console.error("[student_clubs] storage_upload_failed", {
+      kind: "image",
+      bucket: CLUB_LOGO_BUCKET,
+      statusCode: "statusCode" in error ? error.statusCode : undefined,
+      reason: error.name
+    });
     await storage.from(CLUB_LOGO_BUCKET).remove([logoPath]).catch(() => undefined);
-    throw new StudentClubError("upload_failed", 502);
+    throw new StudentClubError("image_upload_failed", 502);
   }
   return logoPath;
+}
+
+async function uploadClubCoverObject(clubId: string, cover: File) {
+  const prepared = await prepareClubImage(cover);
+  await moderateClubLogo(prepared.file);
+  const coverPath = `clubs/${clubId}/cover/${randomUUID()}.${prepared.extension}`;
+  const storage = getSupabaseAdminClient().storage;
+  const { error } = await storage.from(CLUB_LOGO_BUCKET).upload(coverPath, prepared.file, {
+    cacheControl: "31536000",
+    contentType: prepared.contentType,
+    upsert: false
+  });
+  if (error) {
+    console.error("[student_clubs] storage_upload_failed", {
+      kind: "image",
+      bucket: CLUB_LOGO_BUCKET,
+      statusCode: "statusCode" in error ? error.statusCode : undefined,
+      reason: error.name
+    });
+    await storage.from(CLUB_LOGO_BUCKET).remove([coverPath]).catch(() => undefined);
+    throw new StudentClubError("image_upload_failed", 502);
+  }
+  return coverPath;
 }
 
 async function uploadClubApplicationReplacements(input: {
@@ -1429,15 +1953,22 @@ async function uploadClubApplicationReplacements(input: {
     }
 
     if (input.recognitionDocument) {
-      const extension = await validateRecognitionDocument(input.recognitionDocument);
-      documentPath = `clubs/${input.clubId}/verification/${randomUUID()}.${extension}`;
-      const contentType = extension === "pdf" ? "application/pdf" : extension === "jpg" ? "image/jpeg" : "image/png";
-      const { error } = await storage.from(CLUB_DOCUMENT_BUCKET).upload(documentPath, input.recognitionDocument, {
+      const prepared = await prepareClubDocument(input.recognitionDocument);
+      documentPath = `clubs/${input.clubId}/verification/${randomUUID()}.${prepared.extension}`;
+      const { error } = await storage.from(CLUB_DOCUMENT_BUCKET).upload(documentPath, prepared.file, {
         cacheControl: "0",
-        contentType,
+        contentType: prepared.contentType,
         upsert: false
       });
-      if (error) throw error;
+      if (error) {
+        console.error("[student_clubs] storage_upload_failed", {
+          kind: "document",
+          bucket: CLUB_DOCUMENT_BUCKET,
+          statusCode: "statusCode" in error ? error.statusCode : undefined,
+          reason: error.name
+        });
+        throw new StudentClubError("document_upload_failed", 502);
+      }
     }
     return { logoPath, documentPath };
   } catch (error) {
@@ -1471,7 +2002,7 @@ export async function updateCurrentClubApplication(input: ClubApplicationUpdateI
               updated_at = now()
         WHERE club.id = $1::uuid
           AND club.updated_at = $8::timestamptz
-          AND club.status IN ('pending_review', 'clarification_requested')
+          AND club.status IN ('pending_review', 'clarification_requested', 'rejected')
           AND EXISTS (
             SELECT 1
               FROM public.club_memberships membership
@@ -1505,6 +2036,23 @@ export async function updateCurrentClubApplication(input: ClubApplicationUpdateI
        )
        VALUES ($1::uuid, $2::uuid, $3, 'club_application_updated', $4::jsonb, now())`,
       [application.university_id, application.id, user.id, JSON.stringify({ changedFields })]
+    );
+    await client.query(
+      `insert into public.club_application_history (club_id, actor_user_id, action, snapshot)
+       values ($1::uuid, $2, 'application_edited', $3::jsonb)`,
+      [application.id, user.id, JSON.stringify({ changedFields })]
+    );
+    await client.query(
+      `insert into public.club_audit_logs (
+         club_id, actor_user_id, action, entity_type, entity_id, before_data, after_data, metadata
+       ) values ($1::uuid, $2, 'club_application_updated', 'club_application', $1::text, $3::jsonb, $4::jsonb, $5::jsonb)`,
+      [
+        application.id,
+        user.id,
+        JSON.stringify({ updatedAt: application.updated_at }),
+        JSON.stringify({ clubName: fields.clubName, description: fields.description, contactPhone: fields.contactPhone, additionalNote: fields.additionalNote }),
+        JSON.stringify({ changedFields })
+      ]
     );
     await client.query("COMMIT");
   } catch (error) {
@@ -1544,10 +2092,10 @@ export async function updateApprovedClubProfile(input: ApprovedClubProfileInput)
         WHERE club.id = $1::uuid
           AND club.status = 'approved'
           AND membership.user_id = $2
-          AND membership.role = 'club_owner'
+          AND membership.role = any($3::text[])
           AND membership.status = 'active'
      ) AS allowed`,
-    [fields.clubId, user.id]
+    [fields.clubId, user.id, rolesWithClubCapability("club.profile.update")]
   );
   if (!authorization.rows[0]?.allowed) {
     throw new StudentClubError("club_profile_access_denied", 403);
@@ -1555,8 +2103,15 @@ export async function updateApprovedClubProfile(input: ApprovedClubProfileInput)
   const replacementLogoPath = input.logo?.size
     ? await uploadClubLogoObject(fields.clubId, input.logo)
     : null;
+  const replacementCoverPath = input.cover?.size
+    ? await uploadClubCoverObject(fields.clubId, input.cover).catch(async (error) => {
+        if (replacementLogoPath) await getSupabaseAdminClient().storage.from(CLUB_LOGO_BUCKET).remove([replacementLogoPath]).catch(() => undefined);
+        throw error;
+      })
+    : null;
   let client: PoolClient | null = null;
   let previousLogoPath: string | null = null;
+  let previousCoverPath: string | null = null;
   let changedFields: string[] = [];
 
   try {
@@ -1565,22 +2120,30 @@ export async function updateApprovedClubProfile(input: ApprovedClubProfileInput)
     const clubResult = await client.query<{
       id: string;
       university_id: string;
+      acronym: string | null;
+      category: string | null;
       description: string;
       contact_email: string;
       website_url: string | null;
       instagram_url: string | null;
+      social_links: Record<string, unknown>;
       university_page_url: string | null;
       logo_url: string | null;
+      cover_image_url: string | null;
       status: ClubApplicationStatus;
     }>(
       `SELECT club.id,
               club.university_id,
+              club.acronym,
+              club.category,
               club.description,
               club.contact_email,
               club.website_url,
               club.instagram_url,
+              club.social_links,
               club.university_page_url,
               club.logo_url,
+              club.cover_image_url,
               club.status
          FROM public.student_clubs club
         WHERE club.id = $1::uuid
@@ -1595,34 +2158,43 @@ export async function updateApprovedClubProfile(input: ApprovedClubProfileInput)
          FROM public.club_memberships membership
         WHERE membership.club_id = $1::uuid
           AND membership.user_id = $2
-          AND membership.role = 'club_owner'
+          AND membership.role = any($3::text[])
           AND membership.status = 'active'
         LIMIT 1
         FOR SHARE`,
-      [fields.clubId, user.id]
+      [fields.clubId, user.id, rolesWithClubCapability("club.profile.update")]
     );
     if (!membershipResult.rows[0]) throw new StudentClubError("club_profile_access_denied", 403);
     if (club.status !== "approved") throw new StudentClubError("club_profile_not_editable", 409);
 
     changedFields = [
+      ...(club.acronym !== fields.acronym ? ["acronym"] : []),
+      ...(club.category !== fields.category ? ["category"] : []),
       ...(club.description !== fields.description ? ["description"] : []),
       ...(club.contact_email !== fields.contactEmail ? ["contact_email"] : []),
       ...(club.website_url !== fields.websiteUrl ? ["website_url"] : []),
       ...(club.instagram_url !== fields.instagramUrl ? ["instagram_url"] : []),
+      ...((typeof club.social_links?.linkedin === "string" ? club.social_links.linkedin : null) !== fields.linkedinUrl ? ["linkedin_url"] : []),
       ...(club.university_page_url !== fields.universityPageUrl ? ["university_page_url"] : []),
-      ...(replacementLogoPath ? ["logo_url"] : [])
+      ...(replacementLogoPath ? ["logo_url"] : []),
+      ...(replacementCoverPath ? ["cover_image_url"] : [])
     ];
     previousLogoPath = club.logo_url;
+    previousCoverPath = club.cover_image_url;
 
     if (changedFields.length) {
       const updated = await client.query(
         `UPDATE public.student_clubs club
-            SET description = $3,
-                contact_email = $4,
-                website_url = $5,
-                instagram_url = $6,
-                university_page_url = $7,
-                logo_url = COALESCE($8, club.logo_url),
+            SET acronym = $3,
+                category = $4,
+                description = $5,
+                contact_email = $6,
+                website_url = $7,
+                instagram_url = $8,
+                social_links = jsonb_strip_nulls(club.social_links || jsonb_build_object('linkedin', $9::text)),
+                university_page_url = $10,
+                logo_url = COALESCE($11, club.logo_url),
+                cover_image_url = COALESCE($12, club.cover_image_url),
                 updated_at = now()
           WHERE club.id = $1::uuid
             AND club.status = 'approved'
@@ -1631,19 +2203,24 @@ export async function updateApprovedClubProfile(input: ApprovedClubProfileInput)
                 FROM public.club_memberships membership
                WHERE membership.club_id = club.id
                  AND membership.user_id = $2
-                 AND membership.role = 'club_owner'
+                 AND membership.role = any($13::text[])
                  AND membership.status = 'active'
             )
         RETURNING club.id`,
         [
           fields.clubId,
           user.id,
+          fields.acronym,
+          fields.category,
           fields.description,
           fields.contactEmail,
           fields.websiteUrl,
           fields.instagramUrl,
+          fields.linkedinUrl,
           fields.universityPageUrl,
-          replacementLogoPath
+          replacementLogoPath,
+          replacementCoverPath,
+          rolesWithClubCapability("club.profile.update")
         ]
       );
       if (!updated.rows[0]) throw new StudentClubError("club_profile_not_editable", 409);
@@ -1655,12 +2232,44 @@ export async function updateApprovedClubProfile(input: ApprovedClubProfileInput)
          VALUES ($1::uuid, $2::uuid, $3, 'club_profile_updated', $4::jsonb, now())`,
         [club.university_id, fields.clubId, user.id, JSON.stringify({ changedFields })]
       );
+      await client.query(
+        `insert into public.club_audit_logs (
+           club_id, actor_user_id, action, entity_type, entity_id, before_data, after_data, metadata
+         ) values ($1::uuid, $2, 'club_profile_updated', 'club', $1::text, $3::jsonb, $4::jsonb, '{}'::jsonb)`,
+        [
+          fields.clubId,
+          user.id,
+          JSON.stringify({ acronym: club.acronym, category: club.category, description: club.description, contactEmail: club.contact_email, websiteUrl: club.website_url, instagramUrl: club.instagram_url, linkedinUrl: typeof club.social_links?.linkedin === "string" ? club.social_links.linkedin : null, universityPageUrl: club.university_page_url }),
+          JSON.stringify({ acronym: fields.acronym, category: fields.category, description: fields.description, contactEmail: fields.contactEmail, websiteUrl: fields.websiteUrl, instagramUrl: fields.instagramUrl, linkedinUrl: fields.linkedinUrl, universityPageUrl: fields.universityPageUrl })
+        ]
+      );
+      const insertedMedia = [
+        ...(replacementLogoPath && input.logo ? [{ path: replacementLogoPath, kind: "logo", file: input.logo }] : []),
+        ...(replacementCoverPath && input.cover ? [{ path: replacementCoverPath, kind: "cover", file: input.cover }] : [])
+      ];
+      for (const replacedPath of [replacementLogoPath ? previousLogoPath : null, replacementCoverPath ? previousCoverPath : null].filter((value): value is string => Boolean(value))) {
+        await client.query(
+          `update public.club_media_assets set deleted_at = now(), deleted_by = $2
+            where club_id = $1::uuid and storage_bucket = 'event-assets' and object_path = $3 and deleted_at is null`,
+          [fields.clubId, user.id, replacedPath]
+        );
+      }
+      for (const asset of insertedMedia) {
+        await client.query(
+          `insert into public.club_media_assets (club_id, uploaded_by, object_path, media_kind, mime_type, byte_size)
+           values ($1::uuid, $2, $3, $4, $5, $6)`,
+          [fields.clubId, user.id, asset.path, asset.kind, asset.file.type.toLowerCase(), asset.file.size]
+        );
+      }
     }
     await client.query("COMMIT");
   } catch (error) {
     await client?.query("ROLLBACK").catch(() => undefined);
     if (replacementLogoPath) {
       await getSupabaseAdminClient().storage.from(CLUB_LOGO_BUCKET).remove([replacementLogoPath]).catch(() => undefined);
+    }
+    if (replacementCoverPath) {
+      await getSupabaseAdminClient().storage.from(CLUB_LOGO_BUCKET).remove([replacementCoverPath]).catch(() => undefined);
     }
     throw error;
   } finally {
@@ -1674,6 +2283,13 @@ export async function updateApprovedClubProfile(input: ApprovedClubProfileInput)
   ) {
     await getSupabaseAdminClient().storage.from(CLUB_LOGO_BUCKET).remove([previousLogoPath!]).catch(() => undefined);
   }
+  if (
+    replacementCoverPath &&
+    previousCoverPath !== replacementCoverPath &&
+    safeClubStoragePath(fields.clubId, previousCoverPath)
+  ) {
+    await getSupabaseAdminClient().storage.from(CLUB_LOGO_BUCKET).remove([previousCoverPath!]).catch(() => undefined);
+  }
 
   return { clubId: fields.clubId, changedFields };
 }
@@ -1682,7 +2298,7 @@ export async function respondToClubClarification(messageInput: string) {
   const { user, application } = await requirePendingOwnerApplication();
   const message = messageInput.trim();
   if (message.length < 2 || message.length > 2_000) throw new StudentClubError("application_invalid", 422);
-  if (application.status !== "clarification_requested") throw new StudentClubError("review_conflict", 409);
+  if (!(["clarification_requested", "rejected"] as ClubApplicationStatus[]).includes(application.status)) throw new StudentClubError("review_conflict", 409);
   const pool = await getReadyPool();
   const client = await pool.connect();
 
@@ -1690,9 +2306,15 @@ export async function respondToClubClarification(messageInput: string) {
     await client.query("BEGIN");
     const updated = await client.query(
       `UPDATE public.student_clubs club
-          SET status = 'pending_review', updated_at = now()
+          SET status = 'pending_review',
+              application_resubmitted_at = now(),
+              rejected_at = null,
+              rejected_by = null,
+              rejection_reason = null,
+              clarification_message = null,
+              updated_at = now()
         WHERE club.id = $1::uuid
-          AND club.status = 'clarification_requested'
+          AND club.status IN ('clarification_requested', 'rejected')
           AND EXISTS (
             SELECT 1
               FROM public.club_memberships membership
@@ -1716,8 +2338,20 @@ export async function respondToClubClarification(messageInput: string) {
       `INSERT INTO public.event_audit_logs (
          university_id, club_id, actor_user_id, action, metadata, created_at
        )
-       VALUES ($1::uuid, $2::uuid, $3, 'club_application_clarification_responded', '{}'::jsonb, now())`,
-      [application.university_id, application.id, user.id]
+       VALUES ($1::uuid, $2::uuid, $3, $4, '{}'::jsonb, now())`,
+      [application.university_id, application.id, user.id, application.status === "rejected" ? "club_application_resubmitted" : "club_application_clarification_responded"]
+    );
+    await client.query(
+      `insert into public.club_application_history (club_id, actor_user_id, action, snapshot)
+       values ($1::uuid, $2, 'resubmitted', jsonb_build_object('response_recorded', true))`,
+      [application.id, user.id]
+    );
+    await client.query(
+      `insert into public.club_audit_logs (
+         club_id, actor_user_id, action, entity_type, entity_id, after_data, metadata
+       ) values ($1::uuid, $2, 'club_application_resubmitted', 'club_application', $1::text,
+                 jsonb_build_object('status', 'pending_review'), jsonb_build_object('response_length', $3::int))`,
+      [application.id, user.id, message.length]
     );
     await client.query("COMMIT");
   } catch (error) {
@@ -1782,6 +2416,14 @@ export async function moderateClubStatus(input: {
           JSON.stringify({ adminHash: actorHash, reason, membershipIds: suspendedMemberships.rows.map((row) => row.id) })
         ]
       );
+      await client.query(
+        `insert into public.club_audit_logs (
+           club_id, actor_admin_hash, action, entity_type, entity_id, before_data, after_data, metadata
+         ) values ($1::uuid, $2, 'club_suspended', 'club', $1::text,
+                   jsonb_build_object('status', 'approved'), jsonb_build_object('status', 'suspended'),
+                   jsonb_build_object('has_reason', $3::boolean))`,
+        [input.clubId, actorHash, Boolean(reason)]
+      );
     } else {
       if (club.status !== "suspended") throw new StudentClubError("review_conflict", 409);
       const auditResult = await client.query<{ membership_ids: string[] | null }>(
@@ -1821,6 +2463,13 @@ export async function moderateClubStatus(input: {
         `INSERT INTO public.event_audit_logs (university_id, club_id, action, metadata, created_at)
          VALUES ($1::uuid, $2::uuid, 'club_reactivated', $3::jsonb, now())`,
         [club.university_id, input.clubId, JSON.stringify({ adminHash: actorHash, restoredMembershipIds: membershipIds })]
+      );
+      await client.query(
+        `insert into public.club_audit_logs (
+           club_id, actor_admin_hash, action, entity_type, entity_id, before_data, after_data, metadata
+         ) values ($1::uuid, $2, 'club_reactivated', 'club', $1::text,
+                   jsonb_build_object('status', 'suspended'), jsonb_build_object('status', 'approved'), '{}'::jsonb)`,
+        [input.clubId, actorHash]
       );
     }
     await client.query("COMMIT");
@@ -1923,6 +2572,22 @@ export async function reviewClubApplication(input: {
          FROM public.student_clubs club
         WHERE club.id = $1::uuid`,
       [input.clubId, `club_application_${input.decision}`, actorHash, input.decision]
+    );
+    const historyAction = input.decision === "approve" ? "approved" : input.decision === "reject" ? "rejected" : "changes_requested";
+    const nextStatus = input.decision === "approve" ? "approved" : input.decision === "reject" ? "rejected" : "clarification_requested";
+    await client.query(
+      `insert into public.club_application_history (
+         club_id, actor_admin_hash, action, reviewer_comment, snapshot
+       ) values ($1::uuid, $2, $3, $4, jsonb_build_object('status', $5::text))`,
+      [input.clubId, actorHash, historyAction, message, nextStatus]
+    );
+    await client.query(
+      `insert into public.club_audit_logs (
+         club_id, actor_admin_hash, action, entity_type, entity_id, before_data, after_data, metadata
+       ) values ($1::uuid, $2, $3, 'club_application', $1::text,
+                 jsonb_build_object('status', $4::text), jsonb_build_object('status', $5::text),
+                 jsonb_build_object('has_reviewer_comment', $6::boolean))`,
+      [input.clubId, actorHash, `club_application_${input.decision}`, current, nextStatus, Boolean(message)]
     );
     await client.query(
       `INSERT INTO public.notifications (user_id, type, title, body, href, actor_type, actor_id, metadata)

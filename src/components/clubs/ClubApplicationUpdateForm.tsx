@@ -5,11 +5,26 @@ import { useCallback, useState, type FormEvent } from "react";
 
 import type { ClubApplicationView } from "@/lib/server/studentClubs";
 import { clubCopy } from "@/lib/clubs/localization";
+import {
+  CLUB_IMAGE_ACCEPT,
+  ClubUploadValidationError,
+  validateClubImageFile
+} from "@/lib/clubs/uploadValidation";
 import { useLanguage } from "@/lib/i18n";
 
 const fieldClass = "h-11 w-full rounded-lg border border-[#E4E1D8] bg-white px-4 text-sm text-[#0A0A0A] outline-none focus:border-[#0A0A0A]";
 const textareaClass = "w-full resize-y rounded-lg border border-[#E4E1D8] bg-white px-4 py-3 text-sm text-[#0A0A0A] outline-none focus:border-[#0A0A0A]";
 const labelClass = "mb-2 block text-xs font-semibold uppercase tracking-[0.08em] text-[#696969]";
+
+function uploadErrorMessage(code: string, fallback: string) {
+  if (code === "unsupported_image_type") return "Unsupported file type. Use JPG, PNG, WebP, HEIC, or HEIF.";
+  if (code === "image_file_too_large" || code === "upload_request_too_large") return "The image is larger than 4 MB.";
+  if (code === "image_upload_failed" || code === "upload_failed") return "Image upload failed. Please try again.";
+  if (code === "image_moderation_unavailable") return "The image safety check is temporarily unavailable. Please try again.";
+  if (code === "image_rejected") return "This image cannot be uploaded because it did not pass the safety check.";
+  if (code === "network_error") return "Network error, please try again.";
+  return fallback;
+}
 
 export function ClubApplicationUpdateForm({ application }: { application: ClubApplicationView }) {
   const router = useRouter();
@@ -26,16 +41,29 @@ export function ClubApplicationUpdateForm({ application }: { application: ClubAp
     setFeedback("");
     setSaving(true);
     try {
-      const response = await fetch("/api/student-club/application/update", {
-        method: "POST",
-        body: new FormData(event.currentTarget)
-      });
-      const body = (await response.json().catch(() => ({}))) as { ok?: boolean };
-      if (!response.ok || !body.ok) throw new Error("update_failed");
+      const data = new FormData(event.currentTarget);
+      const logo = data.get("logo");
+      if (logo instanceof File && logo.size) await validateClubImageFile(logo);
+      let response: Response;
+      try {
+        response = await fetch("/api/student-club/application/update", {
+          method: "POST",
+          body: data
+        });
+      } catch {
+        throw new Error("network_error");
+      }
+      const body = (await response.json().catch(() => ({}))) as { ok?: boolean; error?: string };
+      if (!response.ok || !body.ok) throw new Error(body.error || "update_failed");
       setFeedback(copy("updateSuccess"));
       router.refresh();
-    } catch {
-      setError(copy("updateFailed"));
+    } catch (caught) {
+      const code = caught instanceof ClubUploadValidationError
+        ? caught.code
+        : caught instanceof Error
+          ? caught.message
+          : "update_failed";
+      setError(uploadErrorMessage(code, copy("updateFailed")));
     } finally {
       setSaving(false);
     }
@@ -92,7 +120,8 @@ export function ClubApplicationUpdateForm({ application }: { application: ClubAp
           <div className="grid gap-4 sm:grid-cols-2">
             <label className="text-sm text-[#696969]">
               <span className="mb-2 block">{copy("logo")}</span>
-              <input name="logo" type="file" accept="image/jpeg,image/png,image/webp" className="block w-full text-sm" />
+              <input name="logo" type="file" accept={CLUB_IMAGE_ACCEPT} className="block w-full text-sm" />
+              <span className="mt-2 block text-xs leading-5">JPG, PNG, WebP, HEIC or HEIF, up to 4 MB.</span>
             </label>
           </div>
         </div>
@@ -101,14 +130,14 @@ export function ClubApplicationUpdateForm({ application }: { application: ClubAp
         </button>
       </form>
 
-      {application.status === "clarification_requested" ? (
+      {application.status === "clarification_requested" || application.status === "rejected" ? (
         <form onSubmit={respond} className="mt-7 border-t border-[#E4E1D8] pt-6">
           <label>
-            <span className={labelClass}>{copy("clarificationResponse")}</span>
-            <textarea name="message" required minLength={2} maxLength={2000} rows={5} placeholder={copy("clarificationPlaceholder")} className={textareaClass} />
+            <span className={labelClass}>{application.status === "rejected" ? "Revision summary" : copy("clarificationResponse")}</span>
+            <textarea name="message" required minLength={2} maxLength={2000} rows={5} placeholder={application.status === "rejected" ? "Explain what you changed before resubmitting." : copy("clarificationPlaceholder")} className={textareaClass} />
           </label>
           <button type="submit" disabled={responding} className="mt-4 inline-flex h-11 w-full items-center justify-center rounded-xl bg-[#FFD84D] px-5 text-sm font-semibold text-[#0A0A0A] disabled:opacity-50">
-            {responding ? copy("sendingResponse") : copy("sendResponse")}
+            {responding ? copy("sendingResponse") : application.status === "rejected" ? "Resubmit application" : copy("sendResponse")}
           </button>
         </form>
       ) : null}
@@ -118,4 +147,3 @@ export function ClubApplicationUpdateForm({ application }: { application: ClubAp
     </section>
   );
 }
-

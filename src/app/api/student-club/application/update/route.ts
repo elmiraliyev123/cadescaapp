@@ -53,7 +53,7 @@ export async function POST(request: Request) {
     const application = await updateCurrentClubApplication(applicationInput(formData));
     return NextResponse.json({ ok: true, application });
   } catch (error) {
-    if (error instanceof StudentClubBodyTooLargeError) return errorResponse(413, "invalid_upload");
+    if (error instanceof StudentClubBodyTooLargeError) return errorResponse(413, "upload_request_too_large");
     if (error instanceof RateLimitError) {
       return errorResponse(429, "application_invalid", rateLimitResponseHeaders(error));
     }
@@ -64,4 +64,3 @@ export async function POST(request: Request) {
     return errorResponse(500, "internal_server_error");
   }
 }
-

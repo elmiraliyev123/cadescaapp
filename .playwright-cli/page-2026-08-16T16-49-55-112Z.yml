@@ -1,0 +1,20 @@
+- generic [active] [ref=f6e1]:
+  - main [ref=f6e3]:
+    - generic [ref=f6e5]:
+      - img "Cadesca" [ref=f6e7]
+      - generic [ref=f6e8]:
+        - button "TR" [ref=f6e9] [cursor=pointer]
+        - button "AZ" [ref=f6e10] [cursor=pointer]
+        - button "EN" [ref=f6e11] [cursor=pointer]
+        - button "RU" [ref=f6e12] [cursor=pointer]
+    - generic [ref=f6e16]:
+      - generic [ref=f6e17]: groups
+      - paragraph [ref=f6e18]: Cadesca Student Clubs
+      - heading "Manage your student club with Cadesca" [level=1] [ref=f6e19]
+      - paragraph [ref=f6e20]: Apply for an official club or manage your existing organization, events and posts.
+      - link "Continue with Cadesca" [ref=f6e21] [cursor=pointer]:
+        - /url: https://studentclub.cadesca.com/auth/start?return_to=%2Fresolve
+        - text: Continue with Cadesca
+        - generic [ref=f6e22]: arrow_forward
+      - paragraph [ref=f6e23]: One Cadesca account works across the entire Cadesca ecosystem.
+  - alert [ref=f6e24]

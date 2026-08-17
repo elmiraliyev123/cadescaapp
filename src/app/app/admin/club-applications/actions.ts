@@ -50,7 +50,7 @@ export async function reviewClubApplicationAction(
       message: text(formData, "message") || null
     });
     revalidatePath("/app/admin/club-applications");
-    revalidatePath("/student-club/status");
+    revalidatePath("/student-club/resolve");
     revalidatePath("/app/user/club");
     revalidatePath("/app/club");
     return { ok: true, action: decision, error: "" };
@@ -76,7 +76,7 @@ export async function moderateClubStatusAction(
       reason: text(formData, "reason") || null
     });
     revalidatePath("/app/admin/club-applications");
-    revalidatePath("/student-club/status");
+    revalidatePath("/student-club/resolve");
     revalidatePath("/app/user/club");
     revalidatePath("/app/club");
     return { ok: true, action, error: "" };

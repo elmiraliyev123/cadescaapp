@@ -1,0 +1,19 @@
+- main [ref=f2e3]:
+  - generic [ref=f2e5]:
+    - img "Cadesca" [ref=f2e7]
+    - generic [ref=f2e8]:
+      - button "TR" [ref=f2e9] [cursor=pointer]
+      - button "AZ" [ref=f2e10] [cursor=pointer]
+      - button "EN" [ref=f2e11] [cursor=pointer]
+      - button "RU" [ref=f2e12] [cursor=pointer]
+  - generic [ref=f2e13]:
+    - complementary [ref=f2e14]:
+      - paragraph [ref=f2e15]: New club application
+      - heading "Apply to join Cadesca" [level=1] [ref=f2e16]
+      - paragraph [ref=f2e17]: Tell us about your student club. Applications are reviewed before publishing and management tools are enabled.
+      - generic [ref=f2e18]:
+        - generic [ref=f2e19]: verified_user
+        - paragraph [ref=f2e21]: Before approval, you can save and manage this application only. Publishing, attendees, team roles and check-in become available after approval.
+    - generic [ref=f2e23]:
+      - generic [ref=f2e24]: school
+      - paragraph [ref=f2e25]: Club applications are temporarily unavailable because no supported university could be loaded.

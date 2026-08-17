@@ -10,6 +10,7 @@
     "start": "next start",
     "build": "next build",
     "test:clubs": "node --conditions=react-server --import tsx scripts/test-club-onboarding.ts",
+    "test:club-uploads:live": "node --conditions=react-server --import tsx scripts/test-club-upload-storage.ts",
     "test:events": "node --import tsx scripts/test-events-domain.ts",
     "test:events:db": "node --import tsx scripts/test-events-db.ts",
     "test:moderation": "node --conditions=react-server --import tsx scripts/test-moderation.ts",
@@ -35,6 +36,7 @@
     "react": "19.2.6",
     "react-dom": "19.2.6",
     "resend": "^6.12.4",
+    "sharp": "0.34.5",
     "server-only": "^0.0.1"
   },
   "devDependencies": {
