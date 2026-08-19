@@ -511,6 +511,10 @@ export async function middleware(request: NextRequest) {
       return finalizeResponse(request, applyLocaleToResponse(redirectTo(request, "/resolve"), localeResolution));
     }
 
+    if (pathname === "/app/club/manage" || pathname.startsWith("/app/club/manage/")) {
+      return finalizeResponse(request, applyLocaleToResponse(NextResponse.next(), localeResolution));
+    }
+
     const studentClubWorkspace = studentClubWorkspacePath(pathname);
     if (studentClubWorkspace) {
       if (!(await hasStudentSession(request))) {
