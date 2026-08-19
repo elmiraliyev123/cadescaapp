@@ -11,7 +11,7 @@ insert into public.oauth_clients (
     'public',
     array['http://127.0.0.1:8000/auth/cadesca/callback'],
     array['openid', 'profile', 'email', 'university'],
-    'bilkent_undergraduate'
+    'active_user'
 )
 on conflict (client_id) do update
 set redirect_uris = excluded.redirect_uris,
