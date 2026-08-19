@@ -1705,6 +1705,22 @@ export async function listCurrentManagedClubs(): Promise<ManagedClubSummary[]> {
   }));
 }
 
+export async function countCurrentManagedClubs() {
+  const user = await getCurrentStudentContext();
+  if (!user || user.status !== "active" || user.id === "user_mock") return 0;
+  const pool = await getReadyPool();
+  const result = await pool.query<{ count: number }>(
+    `SELECT count(*)::int AS count
+       FROM public.student_clubs club
+       JOIN public.club_memberships membership ON membership.club_id = club.id
+      WHERE membership.user_id = $1
+        AND membership.status = 'active'
+        AND club.status = 'approved'`,
+    [user.id]
+  );
+  return Number(result.rows[0]?.count || 0);
+}
+
 function requestedPortalDestination(
   requested: string | undefined,
   clubs: ManagedClubSummary[],

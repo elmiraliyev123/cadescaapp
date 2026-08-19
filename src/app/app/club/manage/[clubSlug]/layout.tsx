@@ -5,7 +5,7 @@ import { ClubManagerShell } from "@/components/clubs/ClubManagerShell";
 import { getAuthUrl, getStudentClubUrl } from "@/lib/appConfig";
 import { getCurrentClubDashboardBySlug } from "@/lib/server/events";
 import { getCurrentStudentContext } from "@/lib/server/social";
-import { listCurrentManagedClubs } from "@/lib/server/studentClubs";
+import { countCurrentManagedClubs } from "@/lib/server/studentClubs";
 
 export const dynamic = "force-dynamic";
 
@@ -13,9 +13,9 @@ export default async function ManagedClubLayout({ children, params }: { children
   const user = await getCurrentStudentContext();
   if (!user) redirect("/");
   const { clubSlug } = await params;
-  const [dashboard, clubs] = await Promise.all([
+  const [dashboard, clubCount] = await Promise.all([
     getCurrentClubDashboardBySlug(clubSlug).catch(() => null),
-    listCurrentManagedClubs()
+    countCurrentManagedClubs()
   ]);
   if (!dashboard) redirect("/resolve");
   const logout = new URL("/logout", getAuthUrl());
@@ -26,7 +26,7 @@ export default async function ManagedClubLayout({ children, params }: { children
       club={{ id: dashboard.club.id, name: dashboard.club.name, slug: dashboard.club.slug, logoUrl: dashboard.club.logoUrl }}
       roles={dashboard.roles}
       user={{ name: user.displayName || user.name, email: user.email, avatarUrl: user.avatarUrl }}
-      clubCount={clubs.length}
+      clubCount={clubCount}
       logoutHref={logout.toString()}
     >{children}</ClubManagerShell>
   </Suspense>;
