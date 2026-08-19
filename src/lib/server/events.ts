@@ -1,6 +1,7 @@
 import "server-only";
 
 import crypto from "node:crypto";
+import { cache } from "react";
 
 import type {
   ClubAuditEntry,
@@ -900,7 +901,7 @@ export async function getCurrentClubDashboard(
   };
 }
 
-export async function getCurrentClubDashboardBySlug(
+export const getCurrentClubDashboardBySlug = cache(async function getCurrentClubDashboardBySlug(
   slugInput: string,
   includePrivateEventConfiguration = false
 ) {
@@ -927,7 +928,7 @@ export async function getCurrentClubDashboardBySlug(
   );
   if (!result.rows[0]) throw new EventsError("club_not_found", 404);
   return getCurrentClubDashboard(result.rows[0].id, includePrivateEventConfiguration);
-}
+});
 
 export async function getClubEventOperations(eventId: string): Promise<ClubEventOperations> {
   const user = await currentStudentRequired();
