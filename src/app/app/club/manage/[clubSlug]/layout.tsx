@@ -1,5 +1,5 @@
 import { Suspense } from "react";
-import { notFound, redirect } from "next/navigation";
+import { redirect } from "next/navigation";
 
 import { ClubManagerShell } from "@/components/clubs/ClubManagerShell";
 import { getAuthUrl, getStudentClubUrl } from "@/lib/appConfig";
@@ -17,7 +17,7 @@ export default async function ManagedClubLayout({ children, params }: { children
     getCurrentClubDashboardBySlug(clubSlug).catch(() => null),
     listCurrentManagedClubs()
   ]);
-  if (!dashboard) notFound();
+  if (!dashboard) redirect("/resolve");
   const logout = new URL("/logout", getAuthUrl());
   logout.searchParams.set("next", getStudentClubUrl());
 
