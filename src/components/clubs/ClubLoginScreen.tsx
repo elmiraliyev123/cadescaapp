@@ -1,14 +1,15 @@
 import Link from "next/link";
 
 import { LanguageSwitcher } from "@/components/ui/LanguageSwitcher";
+import { Logo } from "@/components/ui/Logo";
 
 export function ClubLoginScreen({ authHref }: { authHref: string }) {
   return (
     <main className="flex min-h-dvh min-h-[800px] flex-col overflow-x-clip bg-[#F8F7F3] font-sans text-[#131415]">
       <header className="w-full">
         <div className="mx-auto flex w-full max-w-[1400px] items-center justify-between px-6 py-6 md:px-10 md:py-8">
-          <Link href="/" className="flex h-8 w-8 items-center justify-center rounded-sm text-[#FACC15] transition-transform duration-300 hover:scale-105 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#EDC800] focus-visible:ring-offset-2" aria-label="Cadesca home">
-            <span className="material-symbols-outlined text-[36px] [font-variation-settings:'FILL'_1]" aria-hidden="true">shield</span>
+          <Link href="/" className="rounded-sm transition-transform duration-300 hover:scale-[1.02] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#EDC800] focus-visible:ring-offset-2" aria-label="Cadesca home">
+            <Logo maxWidth={150} />
           </Link>
           <LanguageSwitcher variant="menu" />
         </div>
