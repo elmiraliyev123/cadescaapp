@@ -913,7 +913,7 @@ export async function getCurrentClubDashboardBySlug(
   const result = await pool.query<{ id: string }>(
     `select club.id
        from public.student_clubs club
-      where club.slug = $1
+      where lower(club.slug) = $1
         and club.status = 'approved'
         and exists (
           select 1
